@@ -2,4 +2,9 @@
 
 ## Group members 
 
-## Weekly updates in documentation
+1. Luke Edgecombe @Luk446
+2. Kuroekegha Francis-Epe @KuroFrancis
+3. Gandem Swaroop 
+4. 
+
+#### Weekly updates in /documentation.md
