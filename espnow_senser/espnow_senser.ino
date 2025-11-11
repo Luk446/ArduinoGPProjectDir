@@ -13,6 +13,8 @@
 #include <WiFi.h>
 
 // REPLACE WITH YOUR RECEIVER MAC Address
+// kur - {0x84, 0xF7, 0x03, 0x12, 0xA8, 0xCC}
+// swr - {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x12, 0xA8, 0xCC};
 
 // Structure example to send data
@@ -67,7 +69,7 @@ void setup() {
  
 void loop() {
   // Set values to send
-  strcpy(myData.a, "THIS IS A CHAR");
+  strcpy(myData.a, "Sample message going one way");
   myData.b = random(1,20);
   myData.c = 1.2;
   myData.d = false;
