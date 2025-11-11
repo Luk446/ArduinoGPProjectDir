@@ -7,4 +7,4 @@
 3. Gandem Swaroop 
 4. 
 
-#### Weekly updates in documentation.md
+Weekly updates in [documentation](documentation.md)
