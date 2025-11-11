@@ -1,5 +1,8 @@
 # Week 1
 
+- meeting on 03+07/11/25
+- establishing task
+
 # Week 2
 
 - Established 4 funtional arduino codes
