@@ -25,7 +25,10 @@ typedef struct struct_message {
 struct_message myData;
 
 // callback function that will be executed when data is received
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+void OnDataRecv(const esp_now_recv_info *recv_info, const uint8_t *incomingData, int len) {
+  // Get MAC address from the new structure
+  const uint8_t *mac = recv_info->src_addr;
+  
   memcpy(&myData, incomingData, sizeof(myData));
   Serial.print("Bytes received: ");
   Serial.println(len);
