@@ -13,7 +13,7 @@
 #include <WiFi.h>
 
 // REPLACE WITH YOUR RECEIVER MAC Address
-uint8_t broadcastAddress[] = {84:F7:03:12:A8:CC};
+uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x12, 0xA8, 0xCC};
 
 // Structure example to send data
 // Must match the receiver structure
@@ -30,10 +30,11 @@ struct_message myData;
 esp_now_peer_info_t peerInfo;
 
 // callback when data is sent
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+void OnDataSent(const esp_now_send_info_t *info, esp_now_send_status_t status) {
   Serial.print("\r\nLast Packet Send Status:\t");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
+
  
 void setup() {
   // Init Serial Monitor
