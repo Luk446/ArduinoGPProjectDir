@@ -9,4 +9,5 @@
 - MAC adress checker
 - ESP-NOW Sending
 - ESP-NOW Receiving
-- ESP-NOW Send + Receive for 2 way communication 
+- ESP-NOW Send + Receive for 2 way communication
+- Ignacio joins group
