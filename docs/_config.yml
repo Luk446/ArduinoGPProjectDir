@@ -4,8 +4,8 @@ description: Group Project – Demonstration Website
 
 # Use the same layout for all pages by default
 defaults:
-	- scope:
-			path: ""
-			type: "pages"
-		values:
-			layout: "default"
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
