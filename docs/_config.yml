@@ -1,3 +1,11 @@
 theme: jekyll-theme-minimal
 title: Energy-Efficient Alert Propagation System
 description: Group Project – Demonstration Website
+
+# Use the same layout for all pages by default
+defaults:
+	- scope:
+			path: ""
+			type: "pages"
+		values:
+			layout: "default"

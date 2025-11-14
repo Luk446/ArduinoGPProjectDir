@@ -3,6 +3,8 @@ layout: default
 title: Home
 ---
 
+{% include nav.html %}
+
 # Project Documentation
 ## Group Project – Demonstration Website
 
