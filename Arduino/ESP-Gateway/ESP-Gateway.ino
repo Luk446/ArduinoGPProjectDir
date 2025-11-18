@@ -14,9 +14,11 @@
 #define MQTT_USER "" // not needed
 #define MQTT_TOKEN "" // not needed
 #define MQTT_SUB_TOPIC "ThreshCheck4482"
+#define MQTT_PUB_TOPIC "SensorData4482"
 
 // default threshold
-#define TEMP_THRESHOLD 23.0
+#define DEFAULT_TEMP_THRESHOLD 23.0
+float currentThreshold = DEFAULT_TEMP_THRESHOLD;
 
 // wifi timeout
 #define WIFI_TIMEOUT_MS 10000  // 10 seconds
@@ -28,14 +30,8 @@ uint8_t node3Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x79, 0xF8}; // ignacio
 uint8_t node4Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x86, 0xE8}; // mur
 
 // lab wifi credentials
-#define wifiname "B31IOT-MQTT"
-#define wifipass "QWERTY1234"
-
-// wifi def
-char ssid[] = wifiname;
-char pass[] = wifipass;
-
-// 
+const char* ssid = "B31IOT-MQTT";
+const char* pass = "QWERTY1234";
 
 // ---------------- globals ---------------- //
 
@@ -170,6 +166,28 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   
   payload[length] = 0;
   Serial0.println((char*)payload);
+  
+  // Parse the JSON payload if it's from the threshold topic
+  if (strcmp(topic, MQTT_SUB_TOPIC) == 0) {
+    StaticJsonDocument<100> doc;
+    DeserializationError error = deserializeJson(doc, payload, length);
+    
+    if (!error && doc.containsKey("thresh")) {
+      float newThreshold = doc["thresh"];
+      if (newThreshold != currentThreshold) {
+        Serial0.print("Threshold updated from ");
+        Serial0.print(currentThreshold);
+        Serial0.print(" to ");
+        Serial0.println(newThreshold);
+        currentThreshold = newThreshold;
+        
+        // Re-check temperature threshold with new value
+        checkTemperatureThreshold();
+      }
+    } else {
+      Serial0.println("Error: Invalid threshold JSON or missing 'thresh' field");
+    }
+  }
 }
 
 // check temperature threshold and manage alarm state
@@ -178,12 +196,14 @@ void checkTemperatureThreshold() {
   
   for (int i = 0; i < 4; i++) {
     if (nodeData[i].active && (millis() - nodeData[i].lastUpdate < 30000)) {
-      if (nodeData[i].temp > TEMP_THRESHOLD) {
+      if (nodeData[i].temp > currentThreshold) {
         thresholdExceeded = true;
         Serial0.print("WARNING: NODE ");
         Serial0.print(i + 1);
         Serial0.print(" TEMP EXCEEDED! (");
         Serial0.print(nodeData[i].temp);
+        Serial0.print(" °C > ");
+        Serial0.print(currentThreshold);
         Serial0.println(" °C)");
       }
     }
@@ -259,14 +279,14 @@ void publishToNodeRED() {
   }
   
   payload["alarm"] = alarmActive;
-  payload["threshold"] = TEMP_THRESHOLD;
+  payload["threshold"] = currentThreshold;
   
   serializeJson(jsonDoc, msg, sizeof(msg));
   
   Serial0.println("Publishing to Node-RED:");
   Serial0.println(msg);
   
-  if (!mqtt.publish(MQTT_TOPIC, msg)) {
+  if (!mqtt.publish(MQTT_PUB_TOPIC, msg)) {
     Serial0.println("ERROR: MQTT Publish Failed");
     mqttConnected = false;
   } else {
@@ -275,11 +295,14 @@ void publishToNodeRED() {
 }
 
 void setup() {
+
+  // begin serial communication
   Serial0.begin(115200);
+  // wait for serial monitor
   delay(1000);
+
+  // startup message
   Serial0.println("║    ESP32 GATEWAY STARTING             ║");
-  // broadcastLEDCommand(true, 0, 0, 255);
-  // Serial0.println("Setting default LED colour");
 
   // initialize node data tracking
   for (int i = 0; i < 4; i++) {
@@ -290,7 +313,11 @@ void setup() {
   }
   
   // initialize WiFi in station mode
-  WiFi.mode(WIFI_STA);
+  //WiFi.mode(WIFI_STA);
+  
+  //Serial0.print("MAC Address: ");
+  //Serial0.println(WiFi.macAddress());
+  
   Serial0.print(" Connecting to WiFi");
   
   // Check if WiFi credentials are provided
@@ -298,42 +325,46 @@ void setup() {
     Serial0.println("\n  No WiFi credentials - Running in ESP-NOW only mode");
     wifiConnected = false;
   } else {
+
+    // connect to wifi
     WiFi.begin(ssid, pass);
-    unsigned long startAttemptTime = millis();
+    // unsigned long startAttemptTime = millis();
     
     // Try to connect with timeout
-    while (WiFi.status() != WL_CONNECTED && 
-           millis() - startAttemptTime < WIFI_TIMEOUT_MS) {
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
       delay(500);
       Serial0.print(".");
+      attempts++;
     }
     
     if (WiFi.status() == WL_CONNECTED) {
-      Serial0.println("\n WiFi Connected");
-      Serial0.print("   IP Address: ");
+      Serial0.println("\nWiFi connected");
+      Serial0.print("IP address: ");
       Serial0.println(WiFi.localIP());
-      Serial0.print("   WiFi Channel: ");
-      Serial0.println(WiFi.channel());
-      wifiConnected = true;
     } else {
-      Serial0.println("\n  WiFi connection timeout - Running in ESP-NOW only mode");
-      wifiConnected = false;
+      Serial0.println("\nWiFi connection failed!");
+      return;
     }
+      
+    //   // Set ESP-NOW to use the same channel as WiFi
+    //   Serial0.print("Setting ESP-NOW to WiFi channel: ");
+    //   Serial0.println(wifiChannel);
+    //   esp_wifi_set_channel(wifiChannel, WIFI_SECOND_CHAN_NONE);
+    // } else {
+    //   Serial0.println("\n  WiFi connection timeout - Running in ESP-NOW only mode");
+    //   wifiConnected = false;
+    //   // Only set channel to 1 if WiFi failed
+    //   esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+    //   Serial0.println("Set ESP-NOW to channel 1 (WiFi-only mode)");
+    // }
   }
-  
-  Serial0.print("MAC Address: ");
-  Serial0.println(WiFi.macAddress());
-  
-  // Set WiFi channel to 1 for ESP-NOW communication
-  esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
-  Serial0.println("Set WiFi channel to 1 for ESP-NOW");
   
   if (esp_now_init() != ESP_OK) {
     Serial0.println("ESP-NOW Init Failed");
     ESP.restart();
   }
   Serial0.println("ESP-NOW Initialized");
-  
   Serial0.print("Struct Sizes - sensor_data: ");
   Serial0.print(sizeof(sensor_data));
   Serial0.print(" bytes, led_command: ");
@@ -343,8 +374,9 @@ void setup() {
   esp_now_register_send_cb(esp_now_send_cb_t(OnDataSent));
   esp_now_register_recv_cb(OnDataRecv);
   
-  // Use channel 1 for all ESP-NOW communication
-  peerInfo.channel = 1;
+  // Use the current WiFi channel for ESP-NOW (or 1 if WiFi not connected)
+  int espnowChannel = wifiConnected ? WiFi.channel() : 1;
+  peerInfo.channel = espnowChannel;
   peerInfo.encrypt = false;
   
   Serial0.println("\n Registering Node Peers:");
@@ -372,9 +404,9 @@ void setup() {
   
   memcpy(peerInfo.peer_addr, node4Address, 6);
   if (esp_now_add_peer(&peerInfo) == ESP_OK) {
-    Serial0.println("    mur registered");
+    Serial0.println("  Node 4 (mur) registered");
   } else {
-    Serial0.println("    mur registration failed");
+    Serial0.println("  Node 4 (mur) registration failed");
   }
   
   // Only attempt MQTT if WiFi is connected
@@ -385,8 +417,8 @@ void setup() {
     if (mqtt.connect(MQTT_DEVICEID, MQTT_USER, MQTT_TOKEN)) {
       Serial0.println("SUCCESS: MQTT Connected");
       Serial0.print("   Subscribing to: ");
-      Serial0.println(MQTT_TOPIC_DISPLAY);
-      mqtt.subscribe(MQTT_TOPIC_DISPLAY);
+      Serial0.println(MQTT_SUB_TOPIC);
+      mqtt.subscribe(MQTT_SUB_TOPIC);
       mqttConnected = true;
     } else {
       Serial0.println("ERROR: MQTT Connection Failed");
@@ -429,7 +461,7 @@ void loop() {
         
         if (mqtt.connect(MQTT_DEVICEID, MQTT_USER, MQTT_TOKEN)) {
           Serial0.println("SUCCESS: MQTT Reconnected");
-          mqtt.subscribe(MQTT_TOPIC_DISPLAY);
+          mqtt.subscribe(MQTT_SUB_TOPIC);
           mqttConnected = true;
         } else {
           Serial0.print("ERROR: MQTT Reconnect Failed (State: ");
