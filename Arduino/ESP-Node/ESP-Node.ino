@@ -3,7 +3,10 @@
 #include <Adafruit_NeoPixel.h>
 #include <DHT.h>
 
-#define NODE_ID 1
+// define based on selection
+// swaroop = 1
+// luke = 2
+#define NODE_ID 2
 
 #define RGB_PIN 5
 #define DHT_PIN 4
@@ -37,25 +40,25 @@ unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 5000;
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial.print("Send Status: ");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+  Serial0.print("Send Status: ");
+  Serial0.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
 }
 
 void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
   memcpy(&ledCmd, data, sizeof(ledCmd));
   
-  Serial.println("========================================");
-  Serial.println("LED Command Received from Gateway");
-  Serial.print("Turn On: ");
-  Serial.println(ledCmd.turnOn ? "YES" : "NO");
-  Serial.print("Color (R,G,B): (");
-  Serial.print(ledCmd.r);
-  Serial.print(", ");
-  Serial.print(ledCmd.g);
-  Serial.print(", ");
-  Serial.print(ledCmd.b);
-  Serial.println(")");
-  Serial.println("========================================");
+  Serial0.println("========================================");
+  Serial0.println("LED Command Received from Gateway");
+  Serial0.print("Turn On: ");
+  Serial0.println(ledCmd.turnOn ? "YES" : "NO");
+  Serial0.print("Color (R,G,B): (");
+  Serial0.print(ledCmd.r);
+  Serial0.print(", ");
+  Serial0.print(ledCmd.g);
+  Serial0.print(", ");
+  Serial0.print(ledCmd.b);
+  Serial0.println(")");
+  Serial0.println("========================================");
   
   if (ledCmd.turnOn) {
     pixel.setPixelColor(0, ledCmd.r, ledCmd.g, ledCmd.b);
@@ -71,7 +74,7 @@ void sendSensorData() {
   hum = dht.readHumidity();
   
   if (isnan(temp) || isnan(hum)) {
-    Serial.println("Failed to read DHT sensor");
+    Serial0.println("Failed to read DHT sensor");
     return;
   }
   
@@ -79,33 +82,33 @@ void sendSensorData() {
   sensorData.temp = temp;
   sensorData.hum = hum;
   
-  Serial.println("========================================");
-  Serial.print("Node ");
-  Serial.print(NODE_ID);
-  Serial.println(" - Sending to Gateway");
-  Serial.print("Temperature: ");
-  Serial.print(temp);
-  Serial.println(" C");
-  Serial.print("Humidity: ");
-  Serial.print(hum);
-  Serial.println(" %");
-  Serial.println("========================================");
+  Serial0.println("========================================");
+  Serial0.print("Node ");
+  Serial0.print(NODE_ID);
+  Serial0.println(" - Sending to Gateway");
+  Serial0.print("Temperature: ");
+  Serial0.print(temp);
+  Serial0.println(" C");
+  Serial0.print("Humidity: ");
+  Serial0.print(hum);
+  Serial0.println(" %");
+  Serial0.println("========================================");
   
   esp_err_t result = esp_now_send(gatewayAddress, (uint8_t*)&sensorData, sizeof(sensorData));
   
   if (result != ESP_OK) {
-    Serial.println("Error sending data");
+    Serial0.println("Error sending data");
   }
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial0.begin(115200);
   delay(1000);
-  Serial.println("========================================");
-  Serial.print("ESP32 NODE ");
-  Serial.print(NODE_ID);
-  Serial.println(" STARTING");
-  Serial.println("========================================");
+  Serial0.println("========================================");
+  Serial0.print("ESP32 NODE ");
+  Serial0.print(NODE_ID);
+  Serial0.println(" STARTING");
+  Serial0.println("========================================");
   
   dht.begin();
   pixel.begin();
@@ -113,14 +116,14 @@ void setup() {
   pixel.show();
   
   WiFi.mode(WIFI_STA);
-  Serial.print("MAC Address: ");
-  Serial.println(WiFi.macAddress());
+  Serial0.print("MAC Address: ");
+  Serial0.println(WiFi.macAddress());
   
   if (esp_now_init() != ESP_OK) {
-    Serial.println("ESP-NOW Init Failed");
+    Serial0.println("ESP-NOW Init Failed");
     ESP.restart();
   }
-  Serial.println("ESP-NOW Initialized");
+  Serial0.println("ESP-NOW Initialized");
   
   esp_now_register_send_cb(esp_now_send_cb_t(OnDataSent));
   esp_now_register_recv_cb(OnDataRecv);
@@ -130,10 +133,10 @@ void setup() {
   memcpy(peerInfo.peer_addr, gatewayAddress, 6);
   
   if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial.println("Failed to add Gateway peer");
+    Serial0.println("Failed to add Gateway peer");
     ESP.restart();
   }
-  Serial.println("Gateway registered as peer");
+  Serial0.println("Gateway registered as peer");
   
   pixel.setPixelColor(0, 0, 255, 0);
   pixel.show();
@@ -141,9 +144,9 @@ void setup() {
   pixel.setPixelColor(0, 0, 0, 0);
   pixel.show();
   
-  Serial.println("========================================");
-  Serial.println("NODE READY - MONITORING");
-  Serial.println("========================================");
+  Serial0.println("========================================");
+  Serial0.println("NODE READY - MONITORING");
+  Serial0.println("========================================");
 }
 
 void loop() {
