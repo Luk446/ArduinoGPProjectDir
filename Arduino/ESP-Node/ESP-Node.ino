@@ -4,10 +4,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <DHT.h>
 
-// define based on selection
-// swaroop = 1
-// luke = 2
-#define NODE_ID 2
+#define NODE_ID 1
 
 #define RGB_PIN 5
 #define DHT_PIN 4
@@ -42,8 +39,8 @@ unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 5000;
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial0.print("Send Status: ");
-  Serial0.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+  Serial.print("Send Status: ");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
 }
 
 void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
@@ -92,7 +89,7 @@ void sendSensorData() {
   hum = dht.readHumidity();
   
   if (isnan(temp) || isnan(hum)) {
-    Serial0.println("Failed to read DHT sensor");
+    Serial.println("Failed to read DHT sensor");
     return;
   }
   
@@ -100,52 +97,73 @@ void sendSensorData() {
   sensorData.temp = temp;
   sensorData.hum = hum;
   
-  Serial0.println("========================================");
-  Serial0.print("Node ");
-  Serial0.print(NODE_ID);
-  Serial0.println(" - Sending to Gateway");
-  Serial0.print("Temperature: ");
-  Serial0.print(temp);
-  Serial0.println(" C");
-  Serial0.print("Humidity: ");
-  Serial0.print(hum);
-  Serial0.println(" %");
-  Serial0.println("========================================");
+  Serial.println("========================================");
+  Serial.print("Node ");
+  Serial.print(NODE_ID);
+  Serial.println(" - Sending to Gateway");
+  Serial.print("Temperature: ");
+  Serial.print(temp);
+  Serial.println(" C");
+  Serial.print("Humidity: ");
+  Serial.print(hum);
+  Serial.println(" %");
+  Serial.println("========================================");
   
   esp_err_t result = esp_now_send(gatewayAddress, (uint8_t*)&sensorData, sizeof(sensorData));
   
   if (result != ESP_OK) {
-    Serial0.println("Error sending data");
+    Serial.print("Error sending data: ");
+    Serial.println(result);
   }
 }
 
 void setup() {
-  Serial0.begin(115200);
+  Serial.begin(115200);
   delay(1000);
-  Serial0.println("========================================");
-  Serial0.print("ESP32 NODE ");
-  Serial0.print(NODE_ID);
-  Serial0.println(" STARTING");
-  Serial0.println("========================================");
+  Serial.println("========================================");
+  Serial.print("ESP32 NODE ");
+  Serial.print(NODE_ID);
+  Serial.println(" STARTING");
+  Serial.println("========================================");
   
   dht.begin();
+  
+  Serial.println("Initializing Neopixel...");
   pixel.begin();
+  pixel.setBrightness(50);
+  
+  Serial.println("Testing LED - Blue");
   pixel.setPixelColor(0, 0, 0, 255);
+  pixel.show();
+  delay(1000);
+  
+  Serial.println("Testing LED - Red");
+  pixel.setPixelColor(0, 255, 0, 0);
+  pixel.show();
+  delay(1000);
+  
+  Serial.println("Testing LED - Green");
+  pixel.setPixelColor(0, 0, 255, 0);
+  pixel.show();
+  delay(1000);
+  
+  Serial.println("LED OFF");
+  pixel.setPixelColor(0, 0, 0, 0);
   pixel.show();
   
   WiFi.mode(WIFI_STA);
-  Serial0.print("MAC Address: ");
-  Serial0.println(WiFi.macAddress());
+  Serial.print("MAC Address: ");
+  Serial.println(WiFi.macAddress());
   
   // Set WiFi channel to 1 for ESP-NOW communication
   esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
   Serial0.println("Set WiFi channel to 1 for ESP-NOW");
   
   if (esp_now_init() != ESP_OK) {
-    Serial0.println("ESP-NOW Init Failed");
+    Serial.println("ESP-NOW Init Failed");
     ESP.restart();
   }
-  Serial0.println("ESP-NOW Initialized");
+  Serial.println("ESP-NOW Initialized");
   
   Serial0.print("Struct Sizes - sensor_data: ");
   Serial0.print(sizeof(sensor_data));
@@ -162,7 +180,7 @@ void setup() {
   memcpy(peerInfo.peer_addr, gatewayAddress, 6);
   
   if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial0.println("Failed to add Gateway peer");
+    Serial.println("Failed to add Gateway peer");
     ESP.restart();
   }
   Serial0.println("Gateway registered as peer");
