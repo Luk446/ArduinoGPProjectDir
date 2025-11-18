@@ -1,33 +1,52 @@
+// include libraries
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 
-#define MQTT_HOST ""
+// ---------------- config ----------------- //
+
+// mqtt defines
+#define MQTT_HOST "broker.mqtt.cool"
 #define MQTT_PORT 1883
-#define MQTT_DEVICEID ""
-#define MQTT_USER ""
-#define MQTT_TOKEN ""
-#define MQTT_TOPIC ""
-#define MQTT_TOPIC_DISPLAY ""
+#define MQTT_DEVICEID "esp_gateway"
+#define MQTT_USER "" // not needed
+#define MQTT_TOKEN "" // not needed
+#define MQTT_SUB_TOPIC "ThreshCheck4482"
 
+// default threshold
 #define TEMP_THRESHOLD 23.0
-#define WIFI_TIMEOUT_MS 10000  // 10 seconds timeout for WiFi connection
 
+// wifi timeout
+#define WIFI_TIMEOUT_MS 10000  // 10 seconds
+
+// node addresses
 uint8_t node1Address[] = {0x78, 0xE3, 0x6D, 0x07, 0x90, 0x78}; // swr
 uint8_t node2Address[] = {0xF0, 0xF5, 0xBD, 0xFB, 0x26, 0xB4}; // luke
 uint8_t node3Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x79, 0xF8}; // ignacio
+uint8_t node4Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x86, 0xE8}; // mur
 
-char ssid[] = "";
-char pass[] = "";
+// lab wifi credentials
+#define wifiname "B31IOT-MQTT"
+#define wifipass "QWERTY1234"
 
+// wifi def
+char ssid[] = wifiname;
+char pass[] = wifipass;
+
+// 
+
+// ---------------- globals ---------------- //
+
+// sensor data structure
 typedef struct sensor_data {
   int nodeID;
   float temp;
   float hum;
 } __attribute__((packed)) sensor_data;
 
+// led command structure
 typedef struct led_command {
   uint8_t turnOn;  // Use uint8_t instead of bool for consistent struct packing
   uint8_t r;
@@ -35,9 +54,13 @@ typedef struct led_command {
   uint8_t b;
 } __attribute__((packed)) led_command;
 
+// incoming data instance
 sensor_data incomingData;
+
+// led command instance
 led_command ledCmd;
 
+// node data tracking
 struct NodeData {
   float temp;
   float hum;
@@ -45,10 +68,14 @@ struct NodeData {
   bool active;
 } nodeData[4];
 
+// MQTT objects
 WiFiClient wifiClient;
 PubSubClient mqtt(MQTT_HOST, MQTT_PORT, wifiClient);
+
+// esp-now peer info
 esp_now_peer_info_t peerInfo;
 
+// JSON document and message buffer
 StaticJsonDocument<300> jsonDoc;
 char msg[300];
 bool alarmActive = false;
@@ -61,19 +88,25 @@ bool mqttConnected = false;
 unsigned long lastMqttReconnectAttempt = 0;
 const unsigned long mqttReconnectInterval = 5000;
 
+// ---------------- helpers ---------------- //
+
+// on data sent callback
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial0.print("LED Command Send Status: ");
   Serial0.println(status == ESP_NOW_SEND_SUCCESS ? " Success" : " Fail");
 }
 
+// on data received callback
 void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
-  char macStr[18];
+  char macStr[18]; // format MAC address string
   snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
            recv_info->src_addr[0], recv_info->src_addr[1], recv_info->src_addr[2],
            recv_info->src_addr[3], recv_info->src_addr[4], recv_info->src_addr[5]);
-  
+
+  // copy received data into incomingData struct
   memcpy(&incomingData, data, sizeof(incomingData));
   
+  // debug print received data
   Serial0.println("========================================");
   Serial0.print("Data from Node ");
   Serial0.print(incomingData.nodeID);
@@ -88,9 +121,13 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
   Serial0.println(" %");
   Serial0.println("========================================");
   
+  // update node data tracking
   if (incomingData.nodeID >= 1 && incomingData.nodeID <= 4) {
+
+    // Check if node was previously inactive
     bool wasInactive = !nodeData[incomingData.nodeID - 1].active;
     
+    // Update node data
     nodeData[incomingData.nodeID - 1].temp = incomingData.temp;
     nodeData[incomingData.nodeID - 1].hum = incomingData.hum;
     nodeData[incomingData.nodeID - 1].lastUpdate = millis();
@@ -107,19 +144,25 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
       ledCmd.g = 0;
       ledCmd.b = 255;
       
+      // Send LED command to the specific node
       if (incomingData.nodeID == 1) {
         esp_now_send(node1Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
       } else if (incomingData.nodeID == 2) {
         esp_now_send(node2Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
       } else if (incomingData.nodeID == 3) {
         esp_now_send(node3Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
+      } else if (incomingData.nodeID == 4) {
+        esp_now_send(node4Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
       }
     }
   }
   
+  // check temperature threshold across all nodes
   checkTemperatureThreshold();
 }
 
+
+// on MQTT message received callback
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial0.print("MQTT Message [");
   Serial0.print(topic);
@@ -129,6 +172,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial0.println((char*)payload);
 }
 
+// check temperature threshold and manage alarm state
 void checkTemperatureThreshold() {
   bool thresholdExceeded = false;
   
@@ -157,6 +201,8 @@ void checkTemperatureThreshold() {
   }
 }
 
+
+// broadcast LED command to all nodes
 void broadcastLEDCommand(bool turnOn, uint8_t r, uint8_t g, uint8_t b) {
   ledCmd.turnOn = turnOn;
   ledCmd.r = r;
@@ -175,19 +221,22 @@ void broadcastLEDCommand(bool turnOn, uint8_t r, uint8_t g, uint8_t b) {
   esp_err_t result1 = esp_now_send(node1Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
   esp_err_t result2 = esp_now_send(node2Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
   esp_err_t result3 = esp_now_send(node3Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
+  esp_err_t result4 = esp_now_send(node4Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
   
-  if (result1 != ESP_OK || result2 != ESP_OK || result3 != ESP_OK) {
+  if (result1 != ESP_OK || result2 != ESP_OK || result3 != ESP_OK || result4 != ESP_OK) {
     Serial0.println("Failed to send LED command to one or more nodes");
     Serial0.print("  Node1: ");
     Serial0.print(result1 == ESP_OK ? "OK" : "FAIL");
     Serial0.print(" Node2: ");
     Serial0.print(result2 == ESP_OK ? "OK" : "FAIL");
     Serial0.print(" Node3: ");
-    Serial0.println(result3 == ESP_OK ? "OK" : "FAIL");
+    Serial0.print(result3 == ESP_OK ? "OK" : "FAIL");
+    Serial0.print(" Node4: ");
+    Serial0.println(result4 == ESP_OK ? "OK" : "FAIL");
   }
 }
 
-
+// publish data to Node-RED via MQTT
 void publishToNodeRED() {
   if (!mqttConnected) {
     Serial0.println("WARNING: Cannot publish - MQTT not connected");
@@ -231,6 +280,8 @@ void setup() {
   Serial0.println("║    ESP32 GATEWAY STARTING             ║");
   // broadcastLEDCommand(true, 0, 0, 255);
   // Serial0.println("Setting default LED colour");
+
+  // initialize node data tracking
   for (int i = 0; i < 4; i++) {
     nodeData[i].active = false;
     nodeData[i].temp = 0.0;
@@ -238,6 +289,7 @@ void setup() {
     nodeData[i].lastUpdate = 0;
   }
   
+  // initialize WiFi in station mode
   WiFi.mode(WIFI_STA);
   Serial0.print(" Connecting to WiFi");
   
@@ -316,6 +368,13 @@ void setup() {
     Serial0.println("    Node 3 (ignacio) registered");
   } else {
     Serial0.println("    Node 3 registration failed");
+  }
+  
+  memcpy(peerInfo.peer_addr, node4Address, 6);
+  if (esp_now_add_peer(&peerInfo) == ESP_OK) {
+    Serial0.println("    mur registered");
+  } else {
+    Serial0.println("    mur registration failed");
   }
   
   // Only attempt MQTT if WiFi is connected
