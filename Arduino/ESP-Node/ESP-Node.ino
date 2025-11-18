@@ -3,10 +3,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <DHT.h>
 
-// define based on selection
-// swaroop = 1
-// luke = 2
-#define NODE_ID 2
+#define NODE_ID 1
 
 #define RGB_PIN 5
 #define DHT_PIN 4
@@ -40,33 +37,47 @@ unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 5000;
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial0.print("Send Status: ");
-  Serial0.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+  Serial.print("Send Status: ");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
 }
 
 void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
+  Serial.println("========================================");
+  Serial.print("RECEIVED DATA - Length: ");
+  Serial.println(len);
+  
+  if (len != sizeof(led_command)) {
+    Serial.print("ERROR: Wrong data size! Expected: ");
+    Serial.print(sizeof(led_command));
+    Serial.print(" Got: ");
+    Serial.println(len);
+    return;
+  }
+  
   memcpy(&ledCmd, data, sizeof(ledCmd));
   
-  Serial0.println("========================================");
-  Serial0.println("LED Command Received from Gateway");
-  Serial0.print("Turn On: ");
-  Serial0.println(ledCmd.turnOn ? "YES" : "NO");
-  Serial0.print("Color (R,G,B): (");
-  Serial0.print(ledCmd.r);
-  Serial0.print(", ");
-  Serial0.print(ledCmd.g);
-  Serial0.print(", ");
-  Serial0.print(ledCmd.b);
-  Serial0.println(")");
-  Serial0.println("========================================");
+  Serial.println("LED Command Received from Gateway");
+  Serial.print("Turn On: ");
+  Serial.println(ledCmd.turnOn);
+  Serial.print("R: ");
+  Serial.println(ledCmd.r);
+  Serial.print("G: ");
+  Serial.println(ledCmd.g);
+  Serial.print("B: ");
+  Serial.println(ledCmd.b);
   
   if (ledCmd.turnOn) {
+    Serial.println("Setting LED color...");
     pixel.setPixelColor(0, ledCmd.r, ledCmd.g, ledCmd.b);
     pixel.show();
+    Serial.println("LED updated!");
   } else {
+    Serial.println("Turning LED off...");
     pixel.setPixelColor(0, 0, 0, 0);
     pixel.show();
   }
+  
+  Serial.println("========================================");
 }
 
 void sendSensorData() {
@@ -74,7 +85,7 @@ void sendSensorData() {
   hum = dht.readHumidity();
   
   if (isnan(temp) || isnan(hum)) {
-    Serial0.println("Failed to read DHT sensor");
+    Serial.println("Failed to read DHT sensor");
     return;
   }
   
@@ -82,50 +93,71 @@ void sendSensorData() {
   sensorData.temp = temp;
   sensorData.hum = hum;
   
-  Serial0.println("========================================");
-  Serial0.print("Node ");
-  Serial0.print(NODE_ID);
-  Serial0.println(" - Sending to Gateway");
-  Serial0.print("Temperature: ");
-  Serial0.print(temp);
-  Serial0.println(" C");
-  Serial0.print("Humidity: ");
-  Serial0.print(hum);
-  Serial0.println(" %");
-  Serial0.println("========================================");
+  Serial.println("========================================");
+  Serial.print("Node ");
+  Serial.print(NODE_ID);
+  Serial.println(" - Sending to Gateway");
+  Serial.print("Temperature: ");
+  Serial.print(temp);
+  Serial.println(" C");
+  Serial.print("Humidity: ");
+  Serial.print(hum);
+  Serial.println(" %");
+  Serial.println("========================================");
   
   esp_err_t result = esp_now_send(gatewayAddress, (uint8_t*)&sensorData, sizeof(sensorData));
   
   if (result != ESP_OK) {
-    Serial0.println("Error sending data");
+    Serial.print("Error sending data: ");
+    Serial.println(result);
   }
 }
 
 void setup() {
-  Serial0.begin(115200);
+  Serial.begin(115200);
   delay(1000);
-  Serial0.println("========================================");
-  Serial0.print("ESP32 NODE ");
-  Serial0.print(NODE_ID);
-  Serial0.println(" STARTING");
-  Serial0.println("========================================");
+  Serial.println("========================================");
+  Serial.print("ESP32 NODE ");
+  Serial.print(NODE_ID);
+  Serial.println(" STARTING");
+  Serial.println("========================================");
   
   dht.begin();
+  
+  Serial.println("Initializing Neopixel...");
   pixel.begin();
+  pixel.setBrightness(50);
+  
+  Serial.println("Testing LED - Blue");
   pixel.setPixelColor(0, 0, 0, 255);
+  pixel.show();
+  delay(1000);
+  
+  Serial.println("Testing LED - Red");
+  pixel.setPixelColor(0, 255, 0, 0);
+  pixel.show();
+  delay(1000);
+  
+  Serial.println("Testing LED - Green");
+  pixel.setPixelColor(0, 0, 255, 0);
+  pixel.show();
+  delay(1000);
+  
+  Serial.println("LED OFF");
+  pixel.setPixelColor(0, 0, 0, 0);
   pixel.show();
   
   WiFi.mode(WIFI_STA);
-  Serial0.print("MAC Address: ");
-  Serial0.println(WiFi.macAddress());
+  Serial.print("MAC Address: ");
+  Serial.println(WiFi.macAddress());
   
   if (esp_now_init() != ESP_OK) {
-    Serial0.println("ESP-NOW Init Failed");
+    Serial.println("ESP-NOW Init Failed");
     ESP.restart();
   }
-  Serial0.println("ESP-NOW Initialized");
+  Serial.println("ESP-NOW Initialized");
   
-  esp_now_register_send_cb(esp_now_send_cb_t(OnDataSent));
+  esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
   
   peerInfo.channel = 0;
@@ -133,20 +165,15 @@ void setup() {
   memcpy(peerInfo.peer_addr, gatewayAddress, 6);
   
   if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial0.println("Failed to add Gateway peer");
+    Serial.println("Failed to add Gateway peer");
     ESP.restart();
   }
-  Serial0.println("Gateway registered as peer");
+  Serial.println("Gateway registered as peer");
   
-  pixel.setPixelColor(0, 0, 255, 0);
-  pixel.show();
-  delay(1000);
-  pixel.setPixelColor(0, 0, 0, 0);
-  pixel.show();
-  
-  Serial0.println("========================================");
-  Serial0.println("NODE READY - MONITORING");
-  Serial0.println("========================================");
+  Serial.println("========================================");
+  Serial.println("NODE READY - MONITORING");
+  Serial.println("Waiting for LED commands...");
+  Serial.println("========================================");
 }
 
 void loop() {
