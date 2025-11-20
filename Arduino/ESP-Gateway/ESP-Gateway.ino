@@ -12,13 +12,13 @@
 // MQTT CONFIGURATION
 // MQTT broker settings and credentials
 // ---------------------------------------------------------
-#define MQTT_HOST ""
+#define MQTT_HOST "broker.mqtt.cool"
 #define MQTT_PORT 1883
-#define MQTT_DEVICEID ""
+#define MQTT_DEVICEID "esp_gateway"
 #define MQTT_USER ""
 #define MQTT_TOKEN ""
 #define MQTT_TOPIC ""
-#define MQTT_TOPIC_DISPLAY ""
+#define MQTT_SUB_TOPIC "ThreshCheck4482"
 
 // ---------------------------------------------------------
 // SYSTEM CONFIGURATION
@@ -34,6 +34,8 @@
 uint8_t node1Address[] = {0x78, 0xE3, 0x6D, 0x07, 0x90, 0x78}; // swr
 uint8_t node2Address[] = {0xF0, 0xF5, 0xBD, 0xFB, 0x26, 0xB4}; // luke
 uint8_t node3Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x79, 0xF8}; // ignacio
+uint8_t node4Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x86, 0xE8}; // mur
+
 
 // ---------------------------------------------------------
 // WIFI CREDENTIALS
@@ -46,6 +48,7 @@ const char* pass = "QWERTY1234";
 // DATA STRUCTURES
 // Struct definitions for sensor data and LED commands
 // ---------------------------------------------------------
+
 // Sensor data structure received from nodes
 typedef struct sensor_data {
   int nodeID;
@@ -65,6 +68,7 @@ typedef struct led_command {
 // GLOBAL VARIABLES
 // Instance variables for data handling and state tracking
 // ---------------------------------------------------------
+
 // Incoming sensor data buffer
 sensor_data incomingData;
 // LED command buffer
@@ -81,6 +85,7 @@ struct NodeData {
 // WiFi and MQTT client objects
 WiFiClient wifiClient;
 PubSubClient mqtt(MQTT_HOST, MQTT_PORT, wifiClient);
+
 // ESP-NOW peer information
 esp_now_peer_info_t peerInfo;
 
@@ -244,15 +249,19 @@ void broadcastLEDCommand(bool turnOn, uint8_t r, uint8_t g, uint8_t b) {
   esp_err_t result1 = esp_now_send(node1Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
   esp_err_t result2 = esp_now_send(node2Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
   esp_err_t result3 = esp_now_send(node3Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
+  esp_err_t result4 = esp_now_send(node4Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
   
-  if (result1 != ESP_OK || result2 != ESP_OK || result3 != ESP_OK) {
+  
+  if (result1 != ESP_OK || result2 != ESP_OK || result3 != ESP_OK || result4 != ESP_OK) {
     Serial0.println("Failed to send LED command to one or more nodes");
     Serial0.print("  Node1: ");
     Serial0.print(result1 == ESP_OK ? "OK" : "FAIL");
     Serial0.print(" Node2: ");
     Serial0.print(result2 == ESP_OK ? "OK" : "FAIL");
     Serial0.print(" Node3: ");
-    Serial0.println(result3 == ESP_OK ? "OK" : "FAIL");
+    Serial0.print(result3 == ESP_OK ? "OK" : "FAIL");
+    Serial0.print(" Node4: ");
+    Serial0.println(result4 == ESP_OK ? "OK" : "FAIL");
   }
 }
 
@@ -321,8 +330,10 @@ void setupWIFI() {
     Serial0.println("\nWiFi connected");
     Serial0.print("IP address: ");
     Serial0.println(WiFi.localIP());
+    wifiConnected = true; // FIX: ensure flag reflects successful connection
   } else {
     Serial0.println("\nWiFi connection failed!");
+    wifiConnected = false; // explicitly mark as not connected
     return;
   }
 }
@@ -403,6 +414,7 @@ void setup() {
   registerNode(node1Address, "Node 1 (swr)");
   registerNode(node2Address, "Node 2 (luke)");
   registerNode(node3Address, "Node 3 (ignacio)");
+  registerNode(node4Address, "Node 4 (mur)");
   
   // Only attempt MQTT if WiFi is connected
   if (wifiConnected) {
@@ -412,8 +424,8 @@ void setup() {
     if (mqtt.connect(MQTT_DEVICEID, MQTT_USER, MQTT_TOKEN)) {
       Serial0.println("SUCCESS: MQTT Connected");
       Serial0.print("   Subscribing to: ");
-      Serial0.println(MQTT_TOPIC_DISPLAY);
-      mqtt.subscribe(MQTT_TOPIC_DISPLAY);
+      Serial0.println(MQTT_SUB_TOPIC);
+      mqtt.subscribe(MQTT_SUB_TOPIC);
       mqttConnected = true;
     } else {
       Serial0.println("ERROR: MQTT Connection Failed");
@@ -463,7 +475,7 @@ void loop() {
         
         if (mqtt.connect(MQTT_DEVICEID, MQTT_USER, MQTT_TOKEN)) {
           Serial0.println("SUCCESS: MQTT Reconnected");
-          mqtt.subscribe(MQTT_TOPIC_DISPLAY);
+          mqtt.subscribe(MQTT_SUB_TOPIC);
           mqttConnected = true;
         } else {
           Serial0.print("ERROR: MQTT Reconnect Failed (State: ");
