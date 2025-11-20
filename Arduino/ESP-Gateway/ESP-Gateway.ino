@@ -19,6 +19,9 @@
 #define MQTT_TOKEN ""
 #define MQTT_TOPIC ""
 #define MQTT_SUB_TOPIC "ThreshCheck4482"
+#define MQTT_TEST_TOPIC "TestTopic4482"
+
+float testval = 25.0;
 
 // ---------------------------------------------------------
 // SYSTEM CONFIGURATION
@@ -265,6 +268,28 @@ void broadcastLEDCommand(bool turnOn, uint8_t r, uint8_t g, uint8_t b) {
   }
 }
 
+// ----------------------------------------------------------
+// FUNCTION: check MQTT 
+// publish a test message to check connection
+// publish a test value over the test topic
+// ----------------------------------------------------------
+void checkMQTT() {
+
+  // publish the test value
+  StaticJsonDocument<100> jsonDoc;
+  JsonObject payload = jsonDoc.to<JsonObject>();
+  payload["testing"] = testval;
+  char msg[100];
+  serializeJson(jsonDoc, msg, sizeof(msg));
+  Serial0.print("Publishing to ");
+  Serial0.print(MQTT_TEST_TOPIC);
+  Serial0.print(": ");
+  Serial0.println(msg);
+  mqtt.publish(MQTT_TEST_TOPIC, msg);
+  delay(500);
+}
+
+
 // ---------------------------------------------------------
 // FUNCTION: publishToNodeRED
 // Publishes sensor data from all nodes to MQTT broker
@@ -427,6 +452,9 @@ void setup() {
       Serial0.println(MQTT_SUB_TOPIC);
       mqtt.subscribe(MQTT_SUB_TOPIC);
       mqttConnected = true;
+
+      checkMQTT();
+
     } else {
       Serial0.println("ERROR: MQTT Connection Failed");
       Serial0.print("   MQTT State: ");
