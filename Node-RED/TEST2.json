@@ -1,0 +1,927 @@
+[
+    {
+        "id": "e76821de6a28b706",
+        "type": "tab",
+        "label": "TEST2",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "4d0a5c1ab428c66d",
+        "type": "inject",
+        "z": "e76821de6a28b706",
+        "name": "Temperature In ESP-2",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Temp2",
+        "payload": "0",
+        "payloadType": "num",
+        "x": 210,
+        "y": 440,
+        "wires": [
+            [
+                "1e4043502744dc32",
+                "703502742154161b",
+                "1c9c131180731d2a",
+                "4a3375a20951d90a"
+            ]
+        ]
+    },
+    {
+        "id": "1e4043502744dc32",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "ESP-2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 470,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "703502742154161b",
+        "type": "function",
+        "z": "e76821de6a28b706",
+        "name": "Get Message for temperature",
+        "func": "var temp = Number(msg.payload);\n\nif (temp < 0) {\n    msg.payload = \"Too Cold\";\n}\nelse if (temp >= 0 && temp < 15) {\n    msg.payload = \"Warning Cold\";\n}\nelse if (temp >= 15 && temp < 20) {\n    msg.payload = \"Good Temp\";\n}\nelse if (temp >= 20 && temp < 25) {\n    msg.payload = \"Warning Hot\";\n}\nelse if (temp >= 25) {\n    msg.payload = \"Too Hot\";\n}\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 520,
+        "wires": [
+            [
+                "f0d094247fad2897"
+            ]
+        ]
+    },
+    {
+        "id": "f0d094247fad2897",
+        "type": "ui_text",
+        "z": "e76821de6a28b706",
+        "group": "1d6c583069dfb1e8",
+        "order": 7,
+        "width": 4,
+        "height": 2,
+        "name": "",
+        "label": "Current Condition ESP-2: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "style": true,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "18",
+        "color": "#000000",
+        "x": 830,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "1c9c131180731d2a",
+        "type": "ui_text",
+        "z": "e76821de6a28b706",
+        "group": "1d6c583069dfb1e8",
+        "order": 3,
+        "width": 4,
+        "height": 2,
+        "name": "",
+        "label": "Current Temp ESP-2: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "style": true,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "20",
+        "color": "#000000",
+        "x": 520,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "5fe8e827f475381c",
+        "type": "inject",
+        "z": "e76821de6a28b706",
+        "name": "Temperature In ESP-1",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "temp",
+        "payload": "15",
+        "payloadType": "num",
+        "x": 200,
+        "y": 160,
+        "wires": [
+            [
+                "2b5acc72d5a66677",
+                "182d2ad50d69241f",
+                "7e9e2a5c074d1aa5",
+                "4a3375a20951d90a"
+            ]
+        ]
+    },
+    {
+        "id": "2b5acc72d5a66677",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "ESP-1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 670,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "182d2ad50d69241f",
+        "type": "function",
+        "z": "e76821de6a28b706",
+        "name": "Get Message for temperature",
+        "func": "// 1. Load stored thresholds (persistent)\nvar th1 = flow.get(\"th1\");\nif (th1 === undefined) th1 = 20;\n\nvar th2 = flow.get(\"th2\");\nif (th2 === undefined) th2 = 25;\n\nvar th3 = flow.get(\"th3\");\nif (th3 === undefined) th3 = 30;\n\nvar th4 = flow.get(\"th4\");\nif (th4 === undefined) th4 = 35;\n\n\n// 2. THRESHOLD UPDATE MESSAGE\nif (msg.topic === \"set_threshold_1\") {\n    flow.set(\"th1\", Number(msg.payload));\n    msg.payload = \"Threshold 1 updated to \" + msg.payload;\n    return msg;\n}\n\n\n// 3. TEMPERATURE MESSAGE\nif (msg.topic === \"temp\") {\n    let temp = Number(msg.payload);\n\n    if (temp < th1)        msg.payload = \"Too Cold\";\n    else if (temp < th2)   msg.payload = \"Warning Cold\";\n    else if (temp < th3)   msg.payload = \"Good Temp\";\n    else if (temp < th4)   msg.payload = \"Warning Hot\";\n    else                   msg.payload = \"Too Hot\";\n\n    return msg;\n}\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 220,
+        "wires": [
+            [
+                "f43ede28d628fc1f",
+                "b695c37377040f1b"
+            ]
+        ]
+    },
+    {
+        "id": "7e9e2a5c074d1aa5",
+        "type": "ui_text",
+        "z": "e76821de6a28b706",
+        "group": "1d6c583069dfb1e8",
+        "order": 2,
+        "width": 4,
+        "height": 2,
+        "name": "",
+        "label": "Current Temp ESP-1: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "style": true,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "20",
+        "color": "#000000",
+        "x": 720,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "f43ede28d628fc1f",
+        "type": "ui_text",
+        "z": "e76821de6a28b706",
+        "group": "1d6c583069dfb1e8",
+        "order": 6,
+        "width": 4,
+        "height": 2,
+        "name": "",
+        "label": "Current Condition ESP-1: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "style": true,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "18",
+        "color": "#000000",
+        "x": 1070,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "e2e2d7ae280fb606",
+        "type": "ui_form",
+        "z": "e76821de6a28b706",
+        "name": "",
+        "label": "ESP1 Thresh",
+        "group": "1d6c583069dfb1e8",
+        "order": 10,
+        "width": 4,
+        "height": 1,
+        "options": [
+            {
+                "label": "th1",
+                "value": "th1",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "th2",
+                "value": "th2",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "th3",
+                "value": "th3",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "th4",
+                "value": "th4",
+                "type": "number",
+                "required": true,
+                "rows": null
+            }
+        ],
+        "formValue": {
+            "th1": "",
+            "th2": "",
+            "th3": "",
+            "th4": ""
+        },
+        "payload": "",
+        "submit": "submit",
+        "cancel": "cancel",
+        "topic": "payload",
+        "topicType": "global",
+        "splitLayout": false,
+        "className": "",
+        "x": 170,
+        "y": 200,
+        "wires": [
+            [
+                "04c3671224ca5b99",
+                "544d5be7a2b37a07"
+            ]
+        ]
+    },
+    {
+        "id": "fb7d1053299df9a1",
+        "type": "ui_form",
+        "z": "e76821de6a28b706",
+        "name": "",
+        "label": "ESP2",
+        "group": "1d6c583069dfb1e8",
+        "order": 11,
+        "width": 4,
+        "height": 1,
+        "options": [
+            {
+                "label": "",
+                "value": "ColdTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "LowTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "HighTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "HotTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            }
+        ],
+        "formValue": {
+            "ColdTemp": "",
+            "LowTemp": "",
+            "HighTemp": "",
+            "HotTemp": ""
+        },
+        "payload": "",
+        "submit": "submit",
+        "cancel": "cancel",
+        "topic": "topic",
+        "topicType": "msg",
+        "splitLayout": false,
+        "className": "",
+        "x": 150,
+        "y": 480,
+        "wires": [
+            [
+                "67eacfb0f0327eaa"
+            ]
+        ]
+    },
+    {
+        "id": "452caaab550977bf",
+        "type": "ui_form",
+        "z": "e76821de6a28b706",
+        "name": "",
+        "label": "ESP3",
+        "group": "1d6c583069dfb1e8",
+        "order": 12,
+        "width": 4,
+        "height": 1,
+        "options": [
+            {
+                "label": "",
+                "value": "ColdTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "LowTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "HighTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "HotTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            }
+        ],
+        "formValue": {
+            "ColdTemp": "",
+            "LowTemp": "",
+            "HighTemp": "",
+            "HotTemp": ""
+        },
+        "payload": "",
+        "submit": "submit",
+        "cancel": "cancel",
+        "topic": "topic",
+        "topicType": "msg",
+        "splitLayout": false,
+        "className": "",
+        "x": 150,
+        "y": 640,
+        "wires": [
+            [
+                "8761842d651e3d75"
+            ]
+        ]
+    },
+    {
+        "id": "4cc49a7e0d173aa4",
+        "type": "ui_form",
+        "z": "e76821de6a28b706",
+        "name": "",
+        "label": "ESP4",
+        "group": "1d6c583069dfb1e8",
+        "order": 13,
+        "width": 4,
+        "height": 1,
+        "options": [
+            {
+                "label": "",
+                "value": "ColdTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "LowTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "HighTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "",
+                "value": "HotTemp",
+                "type": "number",
+                "required": true,
+                "rows": null
+            }
+        ],
+        "formValue": {
+            "ColdTemp": "",
+            "LowTemp": "",
+            "HighTemp": "",
+            "HotTemp": ""
+        },
+        "payload": "",
+        "submit": "submit",
+        "cancel": "cancel",
+        "topic": "topic",
+        "topicType": "msg",
+        "splitLayout": false,
+        "className": "",
+        "x": 150,
+        "y": 800,
+        "wires": [
+            [
+                "022f140667c28f73"
+            ]
+        ]
+    },
+    {
+        "id": "4d02aaddd50c21b3",
+        "type": "inject",
+        "z": "e76821de6a28b706",
+        "name": "Temperature In ESP-4",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Temp4",
+        "payload": "20",
+        "payloadType": "num",
+        "x": 210,
+        "y": 760,
+        "wires": [
+            [
+                "f5dc7d2c1011a739",
+                "793169068d5299b6",
+                "0f295b79ab0b97a4",
+                "4a3375a20951d90a"
+            ]
+        ]
+    },
+    {
+        "id": "f5dc7d2c1011a739",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "ESP-4",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 470,
+        "y": 760,
+        "wires": []
+    },
+    {
+        "id": "793169068d5299b6",
+        "type": "function",
+        "z": "e76821de6a28b706",
+        "name": "Get Message for temperature",
+        "func": "var temp = Number(msg.payload);\n\nif (temp < 0) {\n    msg.payload = \"Too Cold\";\n}\nelse if (temp >= 0 && temp < 15) {\n    msg.payload = \"Warning Cold\";\n}\nelse if (temp >= 15 && temp < 20) {\n    msg.payload = \"Good Temp\";\n}\nelse if (temp >= 20 && temp < 25) {\n    msg.payload = \"Warning Hot\";\n}\nelse if (temp >= 25) {\n    msg.payload = \"Too Hot\";\n}\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 840,
+        "wires": [
+            [
+                "4410310814d1c047"
+            ]
+        ]
+    },
+    {
+        "id": "4410310814d1c047",
+        "type": "ui_text",
+        "z": "e76821de6a28b706",
+        "group": "1d6c583069dfb1e8",
+        "order": 9,
+        "width": 4,
+        "height": 2,
+        "name": "",
+        "label": "Current Condition ESP-4: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "style": true,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "18",
+        "color": "#000000",
+        "x": 830,
+        "y": 840,
+        "wires": []
+    },
+    {
+        "id": "0f295b79ab0b97a4",
+        "type": "ui_text",
+        "z": "e76821de6a28b706",
+        "group": "1d6c583069dfb1e8",
+        "order": 5,
+        "width": 4,
+        "height": 2,
+        "name": "",
+        "label": "Current Temp ESP-4: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "style": true,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "20",
+        "color": "#000000",
+        "x": 520,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "f16c71960aa7b625",
+        "type": "inject",
+        "z": "e76821de6a28b706",
+        "name": "Temperature In ESP-3",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Temp3",
+        "payload": "35",
+        "payloadType": "num",
+        "x": 210,
+        "y": 600,
+        "wires": [
+            [
+                "55718ea236f2f10e",
+                "f83d75b9110337cc",
+                "e42da3a42d05aba5",
+                "4a3375a20951d90a"
+            ]
+        ]
+    },
+    {
+        "id": "55718ea236f2f10e",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "ESP-3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 470,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "f83d75b9110337cc",
+        "type": "function",
+        "z": "e76821de6a28b706",
+        "name": "Get Message for temperature",
+        "func": "var temp = Number(msg.payload);\n\nif (temp < 0) {\n    msg.payload = \"Too Cold\";\n}\nelse if (temp >= 0 && temp < 15) {\n    msg.payload = \"Warning Cold\";\n}\nelse if (temp >= 15 && temp < 20) {\n    msg.payload = \"Good Temp\";\n}\nelse if (temp >= 20 && temp < 25) {\n    msg.payload = \"Warning Hot\";\n}\nelse if (temp >= 25) {\n    msg.payload = \"Too Hot\";\n}\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 680,
+        "wires": [
+            [
+                "20fb5f375fa1e024"
+            ]
+        ]
+    },
+    {
+        "id": "e42da3a42d05aba5",
+        "type": "ui_text",
+        "z": "e76821de6a28b706",
+        "group": "1d6c583069dfb1e8",
+        "order": 4,
+        "width": 4,
+        "height": 2,
+        "name": "",
+        "label": "Current Temp ESP-3: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "style": true,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "20",
+        "color": "#000000",
+        "x": 520,
+        "y": 640,
+        "wires": []
+    },
+    {
+        "id": "20fb5f375fa1e024",
+        "type": "ui_text",
+        "z": "e76821de6a28b706",
+        "group": "1d6c583069dfb1e8",
+        "order": 8,
+        "width": 4,
+        "height": 2,
+        "name": "",
+        "label": "Current Condition ESP-3: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "style": true,
+        "font": "Arial,Arial,Helvetica,sans-serif",
+        "fontSize": "18",
+        "color": "#000000",
+        "x": 830,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "4a3375a20951d90a",
+        "type": "ui_chart",
+        "z": "e76821de6a28b706",
+        "name": "",
+        "group": "1d6c583069dfb1e8",
+        "order": 1,
+        "width": 16,
+        "height": 5,
+        "label": "Temp vs. Time (Last 10 readings)",
+        "chartType": "line",
+        "legend": "true",
+        "xformat": "HH:mm:ss",
+        "interpolate": "linear",
+        "nodata": "",
+        "dot": false,
+        "ymin": "",
+        "ymax": "",
+        "removeOlder": "1",
+        "removeOlderPoints": "10",
+        "removeOlderUnit": "60",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#1f77b4",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 1160,
+        "y": 440,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "b21df8b397cb3233",
+        "type": "inject",
+        "z": "e76821de6a28b706",
+        "name": "Clear Chart",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "[]",
+        "payloadType": "json",
+        "x": 1070,
+        "y": 680,
+        "wires": [
+            [
+                "4a3375a20951d90a"
+            ]
+        ]
+    },
+    {
+        "id": "04c3671224ca5b99",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "ESP1 Thresh",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 530,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "67eacfb0f0327eaa",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "ESP2 Thresh",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 310,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "8761842d651e3d75",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "ESP3 Thresh",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 310,
+        "y": 640,
+        "wires": []
+    },
+    {
+        "id": "022f140667c28f73",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "ESP4 Thresh",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 310,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "b695c37377040f1b",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1020,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "544d5be7a2b37a07",
+        "type": "change",
+        "z": "e76821de6a28b706",
+        "name": "",
+        "rules": [
+            {
+                "t": "change",
+                "p": "",
+                "pt": "msg",
+                "from": "",
+                "fromt": "str",
+                "to": "",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 430,
+        "y": 220,
+        "wires": [
+            [
+                "182d2ad50d69241f",
+                "4fd385acc13610a2"
+            ]
+        ]
+    },
+    {
+        "id": "4fd385acc13610a2",
+        "type": "debug",
+        "z": "e76821de6a28b706",
+        "name": "debug 4",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 640,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "1d6c583069dfb1e8",
+        "type": "ui_group",
+        "name": "IoT",
+        "tab": "5900480ebb1115d6",
+        "order": 1,
+        "disp": true,
+        "width": 16,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "5900480ebb1115d6",
+        "type": "ui_tab",
+        "name": "Test1",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "dba1b5547da92169",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]
