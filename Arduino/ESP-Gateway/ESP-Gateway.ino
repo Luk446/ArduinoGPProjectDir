@@ -39,8 +39,8 @@ uint8_t node3Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x79, 0xF8}; // ignacio
 // WIFI CREDENTIALS
 // Network SSID and password
 // ---------------------------------------------------------
-char ssid[] = "";
-char pass[] = "";
+const char* ssid = "B31IOT-MQTT";
+const char* pass = "QWERTY1234";
 
 // ---------------------------------------------------------
 // DATA STRUCTURES
@@ -300,17 +300,65 @@ void publishToNodeRED() {
 }
 
 // ---------------------------------------------------------
+// WIFI CONNECTION SETUP
+void setupWIFI() {
+  Serial0.println("Connecting to WiFi...");
+  delay(500);
+  WiFi.mode(WIFI_STA);
+  delay(500);
+  WiFi.disconnect(); // Disconnect from any previous connections
+  delay(500);
+  WiFi.begin(ssid, pass);
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial0.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial0.println("\nWiFi connected");
+    Serial0.print("IP address: ");
+    Serial0.println(WiFi.localIP());
+  } else {
+    Serial0.println("\nWiFi connection failed!");
+    return;
+  }
+}
+
+// ---------------------------------------------------------
+// FUNCTION: registerNode
+// Registers a node as an ESP-NOW peer
+// Parameters: nodeAddress (MAC address), nodeName (for logging)
+// ---------------------------------------------------------
+void registerNode(uint8_t* nodeAddress, const char* nodeName) {
+  memcpy(peerInfo.peer_addr, nodeAddress, 6);
+  if (esp_now_add_peer(&peerInfo) == ESP_OK) {
+    Serial0.print("    ");
+    Serial0.print(nodeName);
+    Serial0.println(" registered");
+  } else {
+    Serial0.print("    ");
+    Serial0.print(nodeName);
+    Serial0.println(" registration failed");
+  }
+}
+
+// ---------------------------------------------------------
 // SETUP FUNCTION
 // Initializes gateway: WiFi, ESP-NOW, MQTT connections
 // Registers peer nodes for ESP-NOW communication
 // Sets up callbacks and prepares system for operation
+// wifi must start before esp-now
 // ---------------------------------------------------------
 void setup() {
-  Serial0.begin(115200);
-  delay(1000);
-  Serial0.println("║    ESP32 GATEWAY STARTING             ║");
-  // broadcastLEDCommand(true, 0, 0, 255);
-  // Serial0.println("Setting default LED colour");
+  
+  Serial0.begin(115200); // start serial monitor
+  delay(1000); // wait for serial to initialize
+  Serial0.println("║    ESP32 GATEWAY STARTING       ║");
+
+  // Initialize node data structures
   for (int i = 0; i < 4; i++) {
     nodeData[i].active = false;
     nodeData[i].temp = 0.0;
@@ -318,85 +366,43 @@ void setup() {
     nodeData[i].lastUpdate = 0;
   }
   
-  WiFi.mode(WIFI_STA);
-  Serial0.print(" Connecting to WiFi");
-  
-  // Check if WiFi credentials are provided
+  // Check if WiFi credentials are provided then start wifi
   if (strlen(ssid) == 0) {
     Serial0.println("\n  No WiFi credentials - Running in ESP-NOW only mode");
     wifiConnected = false;
   } else {
-    WiFi.begin(ssid, pass);
-    unsigned long startAttemptTime = millis();
-    
-    // Try to connect with timeout
-    while (WiFi.status() != WL_CONNECTED && 
-           millis() - startAttemptTime < WIFI_TIMEOUT_MS) {
-      delay(500);
-      Serial0.print(".");
-    }
-    
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial0.println("\n WiFi Connected");
-      Serial0.print("   IP Address: ");
-      Serial0.println(WiFi.localIP());
-      Serial0.print("   WiFi Channel: ");
-      Serial0.println(WiFi.channel());
-      wifiConnected = true;
-    } else {
-      Serial0.println("\n  WiFi connection timeout - Running in ESP-NOW only mode");
-      wifiConnected = false;
-    }
+    setupWIFI();
   }
-  
-  Serial0.print("MAC Address: ");
-  Serial0.println(WiFi.macAddress());
-  
-  // Set WiFi channel to 1 for ESP-NOW communication
-  esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
-  Serial0.println("Set WiFi channel to 1 for ESP-NOW");
-  
+
+  // start esp-now after wifi
   if (esp_now_init() != ESP_OK) {
-    Serial0.println("ESP-NOW Init Failed");
-    ESP.restart();
+    Serial.println("Error initializing ESP-NOW");
+    return;
   }
-  Serial0.println("ESP-NOW Initialized");
-  
+
+  // print sizes of data structures
   Serial0.print("Struct Sizes - sensor_data: ");
   Serial0.print(sizeof(sensor_data));
   Serial0.print(" bytes, led_command: ");
   Serial0.print(sizeof(led_command));
   Serial0.println(" bytes");
-  
+  delay(500);
+
+  // Register ESP-NOW callbacks
   esp_now_register_send_cb(esp_now_send_cb_t(OnDataSent));
   esp_now_register_recv_cb(OnDataRecv);
-  
+
+  // make sure peers are on same channels
+  esp_now_peer_info_t peer;
   // Use channel 1 for all ESP-NOW communication
   peerInfo.channel = 1;
   peerInfo.encrypt = false;
   
   Serial0.println("\n Registering Node Peers:");
   
-  memcpy(peerInfo.peer_addr, node1Address, 6);
-  if (esp_now_add_peer(&peerInfo) == ESP_OK) {
-    Serial0.println("    Node 1 (swr) registered");
-  } else {
-    Serial0.println("    Node 1 registration failed");
-  }
-  
-  memcpy(peerInfo.peer_addr, node2Address, 6);
-  if (esp_now_add_peer(&peerInfo) == ESP_OK) {
-    Serial0.println("    Node 2 (luke) registered");
-  } else {
-    Serial0.println("    Node 2 registration failed");
-  }
-  
-  memcpy(peerInfo.peer_addr, node3Address, 6);
-  if (esp_now_add_peer(&peerInfo) == ESP_OK) {
-    Serial0.println("    Node 3 (ignacio) registered");
-  } else {
-    Serial0.println("    Node 3 registration failed");
-  }
+  registerNode(node1Address, "Node 1 (swr)");
+  registerNode(node2Address, "Node 2 (luke)");
+  registerNode(node3Address, "Node 3 (ignacio)");
   
   // Only attempt MQTT if WiFi is connected
   if (wifiConnected) {
