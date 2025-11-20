@@ -1,9 +1,17 @@
+// ---------------------------------------------------------
+// LIBRARY IMPORTS
+// Required libraries for WiFi, ESP-NOW, MQTT, and JSON
+// ---------------------------------------------------------
 #include <WiFi.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
 
+// ---------------------------------------------------------
+// MQTT CONFIGURATION
+// MQTT broker settings and credentials
+// ---------------------------------------------------------
 #define MQTT_HOST ""
 #define MQTT_PORT 1883
 #define MQTT_DEVICEID ""
@@ -12,22 +20,40 @@
 #define MQTT_TOPIC ""
 #define MQTT_TOPIC_DISPLAY ""
 
+// ---------------------------------------------------------
+// SYSTEM CONFIGURATION
+// Temperature threshold and WiFi timeout settings
+// ---------------------------------------------------------
 #define TEMP_THRESHOLD 23.0
 #define WIFI_TIMEOUT_MS 10000  // 10 seconds timeout for WiFi connection
 
+// ---------------------------------------------------------
+// NODE MAC ADDRESSES
+// MAC addresses of ESP-NOW peer nodes
+// ---------------------------------------------------------
 uint8_t node1Address[] = {0x78, 0xE3, 0x6D, 0x07, 0x90, 0x78}; // swr
 uint8_t node2Address[] = {0xF0, 0xF5, 0xBD, 0xFB, 0x26, 0xB4}; // luke
 uint8_t node3Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x79, 0xF8}; // ignacio
 
+// ---------------------------------------------------------
+// WIFI CREDENTIALS
+// Network SSID and password
+// ---------------------------------------------------------
 char ssid[] = "";
 char pass[] = "";
 
+// ---------------------------------------------------------
+// DATA STRUCTURES
+// Struct definitions for sensor data and LED commands
+// ---------------------------------------------------------
+// Sensor data structure received from nodes
 typedef struct sensor_data {
   int nodeID;
   float temp;
   float hum;
 } __attribute__((packed)) sensor_data;
 
+// LED command structure sent to nodes
 typedef struct led_command {
   uint8_t turnOn;  // Use uint8_t instead of bool for consistent struct packing
   uint8_t r;
@@ -35,9 +61,16 @@ typedef struct led_command {
   uint8_t b;
 } __attribute__((packed)) led_command;
 
+// ---------------------------------------------------------
+// GLOBAL VARIABLES
+// Instance variables for data handling and state tracking
+// ---------------------------------------------------------
+// Incoming sensor data buffer
 sensor_data incomingData;
+// LED command buffer
 led_command ledCmd;
 
+// Node data storage structure with temperature, humidity, and activity tracking
 struct NodeData {
   float temp;
   float hum;
@@ -45,13 +78,20 @@ struct NodeData {
   bool active;
 } nodeData[4];
 
+// WiFi and MQTT client objects
 WiFiClient wifiClient;
 PubSubClient mqtt(MQTT_HOST, MQTT_PORT, wifiClient);
+// ESP-NOW peer information
 esp_now_peer_info_t peerInfo;
 
+// JSON document for MQTT messages
 StaticJsonDocument<300> jsonDoc;
 char msg[300];
+
+// Alarm state tracking
 bool alarmActive = false;
+
+// MQTT publishing timing variables
 unsigned long lastPublishTime = 0;
 const unsigned long publishInterval = 5000;
 
@@ -61,11 +101,23 @@ bool mqttConnected = false;
 unsigned long lastMqttReconnectAttempt = 0;
 const unsigned long mqttReconnectInterval = 5000;
 
+// ---------------------------------------------------------
+// ESP-NOW CALLBACK: OnDataSent
+// Callback function triggered when ESP-NOW data is sent
+// Reports success or failure of LED command transmission
+// ---------------------------------------------------------
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial0.print("LED Command Send Status: ");
   Serial0.println(status == ESP_NOW_SEND_SUCCESS ? " Success" : " Fail");
 }
 
+// ---------------------------------------------------------
+// ESP-NOW CALLBACK: OnDataRecv
+// Callback function triggered when sensor data is received
+// Processes incoming temperature/humidity data from nodes
+// Updates node data arrays and checks temperature thresholds
+// Sends initial blue LED command when node first connects
+// ---------------------------------------------------------
 void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
   char macStr[18];
   snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
@@ -120,6 +172,11 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
   checkTemperatureThreshold();
 }
 
+// ---------------------------------------------------------
+// MQTT CALLBACK: mqttCallback
+// Callback function for incoming MQTT messages
+// Prints received messages to serial monitor
+// ---------------------------------------------------------
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial0.print("MQTT Message [");
   Serial0.print(topic);
@@ -129,6 +186,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial0.println((char*)payload);
 }
 
+// ---------------------------------------------------------
+// FUNCTION: checkTemperatureThreshold
+// Monitors temperature data from all active nodes
+// Activates alarm (red LED) if any node exceeds threshold
+// Deactivates alarm (green LED) when all temps are normal
+// ---------------------------------------------------------
 void checkTemperatureThreshold() {
   bool thresholdExceeded = false;
   
@@ -157,6 +220,12 @@ void checkTemperatureThreshold() {
   }
 }
 
+// ---------------------------------------------------------
+// FUNCTION: broadcastLEDCommand
+// Sends LED color commands to all registered nodes via ESP-NOW
+// Parameters: turnOn (on/off), r/g/b (RGB color values)
+// Reports success/failure for each node transmission
+// ---------------------------------------------------------
 void broadcastLEDCommand(bool turnOn, uint8_t r, uint8_t g, uint8_t b) {
   ledCmd.turnOn = turnOn;
   ledCmd.r = r;
@@ -187,7 +256,12 @@ void broadcastLEDCommand(bool turnOn, uint8_t r, uint8_t g, uint8_t b) {
   }
 }
 
-
+// ---------------------------------------------------------
+// FUNCTION: publishToNodeRED
+// Publishes sensor data from all nodes to MQTT broker
+// Creates JSON payload with temperature, humidity, and alarm status
+// Only publishes if MQTT connection is active
+// ---------------------------------------------------------
 void publishToNodeRED() {
   if (!mqttConnected) {
     Serial0.println("WARNING: Cannot publish - MQTT not connected");
@@ -225,6 +299,12 @@ void publishToNodeRED() {
   }
 }
 
+// ---------------------------------------------------------
+// SETUP FUNCTION
+// Initializes gateway: WiFi, ESP-NOW, MQTT connections
+// Registers peer nodes for ESP-NOW communication
+// Sets up callbacks and prepares system for operation
+// ---------------------------------------------------------
 void setup() {
   Serial0.begin(115200);
   delay(1000);
@@ -353,6 +433,13 @@ void setup() {
   Serial0.println("╚══════════════════════════════════════╝");
 }
 
+// ---------------------------------------------------------
+// LOOP FUNCTION
+// Main program loop that:
+// - Maintains MQTT connection and handles reconnection
+// - Publishes sensor data at regular intervals
+// - Processes ESP-NOW messages (via callbacks)
+// ---------------------------------------------------------
 void loop() {
   // Only run MQTT operations if WiFi is connected
   if (wifiConnected) {
