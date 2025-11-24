@@ -1,0 +1,34 @@
+[
+    {
+        "id": "5fe8e827f475381c",
+        "type": "inject",
+        "z": "e76821de6a28b706",
+        "name": "Temperature In ESP-1",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "Temp 1",
+        "payload": "26",
+        "payloadType": "num",
+        "x": 210,
+        "y": 140,
+        "wires": [
+            [
+                "2b5acc72d5a66677",
+                "7e9e2a5c074d1aa5",
+                "4a3375a20951d90a",
+                "182d2ad50d69241f"
+            ]
+        ]
+    }
+]

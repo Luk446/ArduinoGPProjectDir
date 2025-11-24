@@ -1,0 +1,23 @@
+[
+    {
+        "id": "182d2ad50d69241f",
+        "type": "function",
+        "z": "e76821de6a28b706",
+        "name": "Get Message for temperature",
+        "func": "var temp = Number(msg.payload)\nvar myData = flow.get(\"myData\")\nvar currentth1 = Number(myData.th1);\nvar currentth2 = Number(myData.th2);\nvar currentth3 = Number(myData.th3);\nvar currentth4 = Number(myData.th4);\n\n\nif (temp < currentth1) {\n    msg.payload = \"Too Cold\";\n}\nelse if ((currentth1 < temp) && (temp <= currentth2)) {\n    msg.payload = \"Warning Cold\";\n}\nelse if ((currentth2 < temp) && (temp <= currentth3)) {\n    msg.payload = \"Good Temp\";\n}\nelse if ((currentth3 < temp) && (temp <= currentth4)) {\n    msg.payload = \"Warning Hot\";\n}\nelse {\n    msg.payload = \"Too Hot\";\n}\n\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 220,
+        "wires": [
+            [
+                "f43ede28d628fc1f",
+                "b695c37377040f1b"
+            ]
+        ]
+    }
+]
