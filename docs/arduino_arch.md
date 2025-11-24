@@ -12,7 +12,7 @@ Arduino architecture is split into two parts: node and gateway.
 
 The node activicty can be described by the flowchart below.
 
-![Node Flow](images/node_flow_new.png)
+![Node Flow](images/node_flow_new.svg)
 
 ## Gateway Loop
 
