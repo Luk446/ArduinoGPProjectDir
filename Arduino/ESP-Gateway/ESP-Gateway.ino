@@ -12,7 +12,7 @@
 // MQTT CONFIGURATION
 // MQTT broker settings and credentials
 // ---------------------------------------------------------
-#define MQTT_HOST "test.mosquitto.org"
+#define MQTT_HOST "broker.hivemq.com"
 #define MQTT_PORT 1883
 #define MQTT_DEVICEID "esp_gateway"
 #define MQTT_USER ""
@@ -20,6 +20,8 @@
 #define MQTT_TOPIC "EnvPublish4482"
 #define MQTT_SUB_TOPIC "ThreshCheck4482"
 #define MQTT_TEST_TOPIC "TestTopic4482"
+#define MQTT_LED_TOPIC "LEDOverride4482"  // New topic for remote LED override commands
+#define MQTT_LED_COMMAND_TOPIC "LEDCommand4482"
 
 float testval = 25.0;
 
@@ -27,7 +29,7 @@ float testval = 25.0;
 // SYSTEM CONFIGURATION
 // Temperature threshold and WiFi timeout settings
 // ---------------------------------------------------------
-#define TEMP_THRESHOLD 15
+float TEMP_THRESHOLD = 15.0;  // Changed to float so it can be updated via MQTT
 #define WIFI_TIMEOUT_MS 10000  // 10 seconds timeout for WiFi connection
 
 // ---------------------------------------------------------
@@ -100,6 +102,13 @@ char msg[300];
 // Alarm state tracking
 bool alarmActive = false;
 
+// Remote LED override state
+bool remoteOverrideActive = false; // true when MQTT payload sets override
+uint8_t overrideOn = 1;            // default LED on
+uint8_t overrideR = 0;             // default green
+uint8_t overrideG = 255;
+uint8_t overrideB = 0;
+
 // MQTT publishing timing variables
 unsigned long lastPublishTime = 0;
 const unsigned long publishInterval = 5000;
@@ -159,24 +168,23 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
     nodeData[incomingData.nodeID - 1].lastUpdate = millis();
     nodeData[incomingData.nodeID - 1].active = true;
     
-    // Always send LED command based on current alarm state when receiving data
-    // This ensures deep sleep nodes get the current status when they wake
+    // Send LED status based on remote override if active
     Serial0.print("Sending LED status to Node ");
     Serial0.print(incomingData.nodeID);
     Serial0.print(": ");
-    
-    if (alarmActive) {
-      Serial0.println("ALARM RED");
-      ledCmd.turnOn = 1;
-      ledCmd.r = 255;
-      ledCmd.g = 0;
-      ledCmd.b = 0;
+
+    if (remoteOverrideActive) {
+      Serial0.println("REMOTE OVERRIDE");
+      ledCmd.turnOn = overrideOn;
+      ledCmd.r = overrideR;
+      ledCmd.g = overrideG;
+      ledCmd.b = overrideB;
     } else {
-      Serial0.println("NORMAL GREEN");
-      ledCmd.turnOn = 1;
-      ledCmd.r = 0;
-      ledCmd.g = 255;
-      ledCmd.b = 0;
+      Serial0.println("NO OVERRIDE - LED unchanged");
+      ledCmd.turnOn = overrideOn; // keep last known state
+      ledCmd.r = overrideR;
+      ledCmd.g = overrideG;
+      ledCmd.b = overrideB;
     }
     
     // Send to the specific node that just sent data
@@ -203,15 +211,70 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
 // ---------------------------------------------------------
 // MQTT CALLBACK: mqttCallback
 // Callback function for incoming MQTT messages
-// Prints received messages to serial monitor
+// Parses threshold updates from ThreshCheck topic
 // ---------------------------------------------------------
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  payload[length] = 0;
+  
   Serial0.print("MQTT Message [");
   Serial0.print(topic);
   Serial0.print("]: ");
-  
-  payload[length] = 0;
   Serial0.println((char*)payload);
+  
+  // Update threshold if message is from ThreshCheck topic
+  if (String(topic) == MQTT_SUB_TOPIC) {
+    StaticJsonDocument<100> doc;
+    deserializeJson(doc, payload);
+    float newThreshold = doc["thresh"];
+    
+    Serial0.print("Threshold updated: ");
+    Serial0.print(TEMP_THRESHOLD);
+    Serial0.print(" -> ");
+    Serial0.println(newThreshold);
+    TEMP_THRESHOLD = newThreshold;
+    checkTemperatureThreshold();
+    return; // done processing threshold message
+  }
+
+  // LED override handling
+  if (String(topic) == MQTT_LED_TOPIC) {
+    StaticJsonDocument<128> doc;
+    DeserializationError err = deserializeJson(doc, payload);
+    if (err) {
+      Serial0.print("ERROR: LED JSON parse failed: ");
+      Serial0.println(err.c_str());
+      return;
+    }
+
+    bool overrideFlag = doc["override"].as<bool>();
+    bool onFlag = doc["on"].as<bool>();
+    int rVal = doc["r"].as<int>();
+    int gVal = doc["g"].as<int>();
+    int bVal = doc["b"].as<int>();
+
+    // Clamp RGB values
+    rVal = constrain(rVal, 0, 255);
+    gVal = constrain(gVal, 0, 255);
+    bVal = constrain(bVal, 0, 255);
+
+    remoteOverrideActive = overrideFlag;
+    overrideOn = onFlag ? 1 : 0;
+    overrideR = (uint8_t)rVal;
+    overrideG = (uint8_t)gVal;
+    overrideB = (uint8_t)bVal;
+
+    Serial0.println("LED Override Updated:");
+    Serial0.print("  Active: "); Serial0.println(remoteOverrideActive ? "YES" : "NO");
+    Serial0.print("  On: "); Serial0.println(overrideOn ? "YES" : "NO");
+    Serial0.print("  Color: R="); Serial0.print(overrideR);
+    Serial0.print(" G="); Serial0.print(overrideG);
+    Serial0.print(" B="); Serial0.println(overrideB);
+
+    if (remoteOverrideActive) {
+      broadcastLEDCommand(overrideOn, overrideR, overrideG, overrideB);
+    }
+    return; // done processing LED override
+  }
 }
 
 // ---------------------------------------------------------
@@ -238,13 +301,10 @@ void checkTemperatureThreshold() {
   
   if (thresholdExceeded && !alarmActive) {
     alarmActive = true;
-    Serial0.println("ALARM ACTIVATED - SENDING RED LED COMMAND TO ALL NODES");
-    broadcastLEDCommand(true, 255, 0, 0);
-  } 
-  else if (!thresholdExceeded && alarmActive) {
+    Serial0.println("ALARM ACTIVATED (no LED broadcast)");
+  } else if (!thresholdExceeded && alarmActive) {
     alarmActive = false;
-    Serial0.println("ALARM DEACTIVATED - SENDING GREEN LED COMMAND TO ALL NODES");
-    broadcastLEDCommand(true, 0, 255, 0);
+    Serial0.println("ALARM DEACTIVATED (no LED broadcast)");
   }
 }
 
@@ -267,6 +327,10 @@ void broadcastLEDCommand(bool turnOn, uint8_t r, uint8_t g, uint8_t b) {
   Serial0.print(g);
   Serial0.print(" B=");
   Serial0.println(b);
+  Serial0.println("");
+  Serial0.println("Current Temp Threshold");
+  Serial0.print(TEMP_THRESHOLD);
+  Serial0.println("");
   
   // Send to each registered node individually
   esp_err_t result1 = esp_now_send(node1Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
@@ -483,6 +547,9 @@ void setup() {
       Serial0.print("   Subscribing to: ");
       Serial0.println(MQTT_SUB_TOPIC);
       mqtt.subscribe(MQTT_SUB_TOPIC);
+      Serial0.print("   Subscribing to: ");
+      Serial0.println(MQTT_LED_TOPIC);
+      mqtt.subscribe(MQTT_LED_TOPIC); // subscribe to LED override topic
       mqttConnected = true;
 
       checkMQTT();
@@ -536,6 +603,7 @@ void loop() {
         if (mqtt.connect(MQTT_DEVICEID, MQTT_USER, MQTT_TOKEN)) {
           Serial0.println("SUCCESS: MQTT Reconnected");
           mqtt.subscribe(MQTT_SUB_TOPIC);
+          mqtt.subscribe(MQTT_LED_TOPIC);
           mqttConnected = true;
         } else {
           Serial0.print("ERROR: MQTT Reconnect Failed (State: ");
@@ -559,13 +627,16 @@ void loop() {
   // Ensures nodes get LED updates even if they wake between data transmissions
   unsigned long currentTime = millis();
   if (currentTime - lastLEDBroadcastTime >= ledBroadcastInterval) {
-    if (alarmActive) {
-      Serial0.println("Periodic Broadcast: ALARM RED");
-      broadcastLEDCommand(true, 255, 0, 0);
+    Serial0.print("Periodic Broadcast: ");
+    if (remoteOverrideActive) {
+      Serial0.print("OVERRIDE ");
     } else {
-      Serial0.println("Periodic Broadcast: NORMAL GREEN");
-      broadcastLEDCommand(true, 0, 255, 0);
+      Serial0.print("DEFAULT ");
     }
+    Serial0.print("R="); Serial0.print(overrideR);
+    Serial0.print(" G="); Serial0.print(overrideG);
+    Serial0.print(" B="); Serial0.println(overrideB);
+    broadcastLEDCommand(overrideOn, overrideR, overrideG, overrideB);
     lastLEDBroadcastTime = currentTime;
   }
   
