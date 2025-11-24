@@ -17,7 +17,7 @@
 #define MQTT_DEVICEID "esp_gateway"
 #define MQTT_USER ""
 #define MQTT_TOKEN ""
-#define MQTT_TOPIC ""
+#define MQTT_TOPIC "EnvPublish4482"
 #define MQTT_SUB_TOPIC "ThreshCheck4482"
 #define MQTT_TEST_TOPIC "TestTopic4482"
 
@@ -35,7 +35,8 @@ float testval = 25.0;
 // MAC addresses of ESP-NOW peer nodes
 // ---------------------------------------------------------
 uint8_t node1Address[] = {0x78, 0xE3, 0x6D, 0x07, 0x90, 0x78}; // swr
-uint8_t node2Address[] = {0xF0, 0xF5, 0xBD, 0xFB, 0x26, 0xB4}; // luke
+// 84:F7:03:12:A8:CC kuro
+uint8_t node2Address[] = {0x84, 0xF7, 0x03, 0x12, 0xA8, 0xCC}; //kuro 
 uint8_t node3Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x79, 0xF8}; // ignacio
 uint8_t node4Address[] = {0x08, 0xB6, 0x1F, 0x28, 0x86, 0xE8}; // mur
 
@@ -355,6 +356,11 @@ void setupWIFI() {
     Serial0.println("\nWiFi connected");
     Serial0.print("IP address: ");
     Serial0.println(WiFi.localIP());
+    
+    // Print the WiFi channel (ESP-NOW must use same channel as WiFi)
+    Serial0.print("WiFi Channel: ");
+    Serial0.println(WiFi.channel());
+    
     wifiConnected = true; // FIX: ensure flag reflects successful connection
   } else {
     Serial0.println("\nWiFi connection failed!");
@@ -393,6 +399,7 @@ void setup() {
   Serial0.begin(115200); // start serial monitor
   delay(1000); // wait for serial to initialize
   Serial0.println("║    ESP32 GATEWAY STARTING       ║");
+  
 
   // Initialize node data structures
   for (int i = 0; i < 4; i++) {
@@ -440,6 +447,8 @@ void setup() {
   registerNode(node2Address, "Node 2 (luke)");
   registerNode(node3Address, "Node 3 (ignacio)");
   registerNode(node4Address, "Node 4 (mur)");
+
+  Serial0.println(WiFi.macAddress());
   
   // Only attempt MQTT if WiFi is connected
   if (wifiConnected) {
