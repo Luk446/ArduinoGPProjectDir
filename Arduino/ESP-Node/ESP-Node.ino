@@ -7,14 +7,14 @@
 // define based on selection
 // swaroop = 1
 // luke = 2
-#define NODE_ID 2
+#define NODE_ID 1
 
 #define RGB_PIN 5
 #define DHT_PIN 4
 #define DHTTYPE DHT11
 #define NEOPIXEL_TYPE (NEO_GRB + NEO_KHZ800)
 
-uint8_t gatewayAddress[] = {0x84, 0xF7, 0x03, 0x12, 0xA8, 0xCC};
+uint8_t gatewayAddress[] = {0xF0, 0xF5, 0xBD, 0xFB, 0x26, 0xB4};
 
 typedef struct sensor_data {
   int nodeID;
