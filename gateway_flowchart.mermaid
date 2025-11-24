@@ -1,0 +1,80 @@
+flowchart TD
+
+
+
+%% ============================
+%% 3. VOID LOOP()
+%% ============================
+subgraph LOOP["3. void loop()"]
+    direction TB
+    L1{"WiFi Connected?"}
+    L1 -->|Yes| L2["mqtt.loop()"]
+    L1 -->|No| L9["Skip MQTT Operations"]
+    L2 --> L3{"MQTT Connected?"}
+    L3 -->|No| L4["Check Reconnect Interval"]
+    L3 -->|Yes| L7["Set mqttConnected = true"]
+    L4 --> L5["Attempt MQTT Reconnect"]
+    L5 --> L6{"Reconnect\nSuccessful?"}
+    L6 -->|Yes| L7
+    L6 -->|No| L8["Log Error"]
+    L7 --> L10{"Publish Interval\nElapsed?"}
+    L8 --> L9
+    L10 -->|Yes| L11["publishToNodeRED()"]
+    L10 -->|No| L12["Continue"]
+    L11 --> L12
+    L9 --> L12
+    L12["ESP-NOW Receives Data\nvia Callbacks"] --> L13["delay(100ms)"]
+    L13 --> L1
+end
+
+%% ============================
+%% 2. VOID SETUP()
+%% ============================
+subgraph SETUP["2. void setup()"]
+    direction TB
+    S1["Start Serial Monitor"] --> S2["Initialize Node Data Structures"]
+    S2 --> S3{"WiFi Credentials\nProvided?"}
+    S3 -->|Yes| S4["setupWIFI()"]
+    S3 -->|No| S5["ESP-NOW Only Mode"]
+    S4 --> S6["Initialize ESP-NOW"]
+    S5 --> S6
+    S6 --> S7["Register Callbacks:\nOnDataSent, OnDataRecv"]
+    S7 --> S8["Set Peer Channel to 1"]
+    S8 --> S9["registerNode(): Node 1-4"]
+    S9 --> S10{"WiFi Connected?"}
+    S10 -->|Yes| S11["Connect to MQTT Broker"]
+    S10 -->|No| S12["Skip MQTT Setup"]
+    S11 --> S13["Subscribe to MQTT Topic"]
+    S13 --> S14["checkMQTT()"]
+    S14 --> S15["Gateway Ready"]
+    S12 --> S15
+end
+
+%% ============================
+%% 1. VOID FUNCTION()
+%% ============================
+subgraph FUNCTIONS["1. void function()"]
+    direction TB
+    F1["OnDataSent()"] --> F2["OnDataRecv()"]
+    F2 --> F3["mqttCallback()"]
+    F3 --> F4["checkTemperatureThreshold()"]
+    F4 --> F5["broadcastLEDCommand()"]
+    F5 --> F6["checkMQTT()"]
+    F6 --> F7["publishToNodeRED()"]
+    F7 --> F8["setupWIFI()"]
+    F8 --> F9["registerNode()"]
+end
+
+
+%% ============================
+%% 0. CONFIGURE (Simplified)
+%% ============================
+subgraph CONFIGURE["0. Configure"]
+    direction TB
+    C1["Import Libraries"] --> C2["Set MQTT Configuration"]
+    C2 --> C3["Set System Parameters"]
+    C3 --> C4["Define Node Addresses"]
+    C4 --> C5["Store WiFi Credentials"]
+    C5 --> C6["Define Data Structures"]
+    C6 --> C7["Initialize Global Variables"]
+end

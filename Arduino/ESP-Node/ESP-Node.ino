@@ -6,8 +6,10 @@
 
 // define based on selection
 // swaroop = 1
-// luke = 2
-#define NODE_ID 1
+// kuro = 2
+// ignacio = 3
+// mur = 4
+#define NODE_ID 2
 
 #define RGB_PIN 5
 #define DHT_PIN 4
@@ -137,9 +139,9 @@ void setup() {
   Serial0.print("MAC Address: ");
   Serial0.println(WiFi.macAddress());
   
-  // Set WiFi channel to 1 for ESP-NOW communication
-  esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
-  Serial0.println("Set WiFi channel to 1 for ESP-NOW");
+  // Set WiFi channel to 10 for ESP-NOW communication (must match Gateway)
+  esp_wifi_set_channel(10, WIFI_SECOND_CHAN_NONE);
+  Serial0.println("Set WiFi channel to 10 for ESP-NOW");
   
   if (esp_now_init() != ESP_OK) {
     Serial0.println("ESP-NOW Init Failed");
@@ -156,8 +158,8 @@ void setup() {
   esp_now_register_send_cb(esp_now_send_cb_t(OnDataSent));
   esp_now_register_recv_cb(OnDataRecv);
   
-  // Use channel 1 to match Gateway
-  peerInfo.channel = 1;
+  // Use channel 10 to match Gateway
+  peerInfo.channel = 10;
   peerInfo.encrypt = false;
   memcpy(peerInfo.peer_addr, gatewayAddress, 6);
   

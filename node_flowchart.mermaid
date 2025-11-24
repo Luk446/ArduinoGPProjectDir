@@ -1,0 +1,30 @@
+flowchart TD
+
+L1["Begin"]
+
+LP["loop"]
+CHK["Check for Online Alert"]
+ALR{"Alarm LED"}
+
+CD["Collect Local Data"]
+
+IF{"Check Temp"}
+TH["Too hot"]
+NORM["Normal+Different"]
+LOG[(Log Data)]
+SAME["Same"]
+
+BC["Broadcast Online Alert"]
+TRD["Transmit Data"]
+
+DS{"Deep Sleep"}
+
+L1 --> LP --> CHK --> CD --> IF
+CHK --> ALR
+
+IF -->TH --> BC --> ALR --> CD
+IF -->NORM --> TRD --> LOG --> DS
+IF -->SAME --> DS --> LP
+
+LOG <--> IF
+
