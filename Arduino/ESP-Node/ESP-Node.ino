@@ -20,8 +20,11 @@
 #define DEEP_SLEEP_DURATION 10000000
 #define LISTEN_WINDOW_MS 10000  // Stay awake for 2 seconds to receive commands
 
-// RTC memory variable - survives deep sleep to track last sent temperature
-RTC_DATA_ATTR float lastSentTemp = -999.0; // Initialize with impossible value
+// RTC memory variables - survive deep sleep
+RTC_DATA_ATTR float lastSentTemp = -999.0; // Track last sent temperature
+RTC_DATA_ATTR uint8_t lastLedR = 0;        // Last LED color (persists across sleep)
+RTC_DATA_ATTR uint8_t lastLedG = 255;
+RTC_DATA_ATTR uint8_t lastLedB = 0;
 
 uint8_t gatewayAddress[] = {0xF0, 0xF5, 0xBD, 0xFB, 0x26, 0xB4};
 
@@ -91,9 +94,12 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
     Serial0.print(ledCmd.b);
     Serial0.println(")");
     
-    // Always update LED color, never turn it off
+    // Always update LED color and save to RTC memory
     pixel.setPixelColor(0, ledCmd.r, ledCmd.g, ledCmd.b);
     pixel.show();
+    lastLedR = ledCmd.r;
+    lastLedG = ledCmd.g;
+    lastLedB = ledCmd.b;
     Serial0.println("LED Updated!");
   } else {
     Serial0.println("WARNING: Received data size mismatch - ignoring");
@@ -164,7 +170,8 @@ void setup() {
   
   dht.begin();
   pixel.begin();
-  pixel.setPixelColor(0, 0, 0, 255);
+  // Restore last LED color from RTC memory
+  pixel.setPixelColor(0, lastLedR, lastLedG, lastLedB);
   pixel.show();
   
   WiFi.mode(WIFI_STA);
@@ -200,11 +207,6 @@ void setup() {
     ESP.restart();
   }
   Serial0.println("Gateway registered as peer");
-  
-  // Initialize LED to green (normal state)
-  pixel.setPixelColor(0, 0, 255, 0);
-  pixel.show();
-  delay(1000);
   
   Serial0.println("========================================");
   Serial0.println("NODE READY - DEEP SLEEP MODE");
