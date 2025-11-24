@@ -7,3 +7,4 @@ permalink: /architecture/node/
 {% include nav.html %}
 
 # Node-RED Architecture
+

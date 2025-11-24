@@ -20,5 +20,3 @@ The gateway control loop coordinates WiFi, MQTT connectivity, ESP-NOW data recep
 
 ![Gateway Loop Flow](images/gatewayloop.png)
 
-<p class="caption">Figure: Gateway main loop integrating MQTT reconnect logic, publish interval handling, and periodic LED override broadcasts to ESP-NOW nodes.</p>
-
