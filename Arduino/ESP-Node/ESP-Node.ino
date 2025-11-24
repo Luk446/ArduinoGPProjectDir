@@ -16,6 +16,13 @@
 #define DHTTYPE DHT11
 #define NEOPIXEL_TYPE (NEO_GRB + NEO_KHZ800)
 
+// Deep sleep configuration (10 seconds = 10,000,000 microseconds)
+#define DEEP_SLEEP_DURATION 10000000
+#define LISTEN_WINDOW_MS 10000  // Stay awake for 2 seconds to receive commands
+
+// RTC memory variable - survives deep sleep to track last sent temperature
+RTC_DATA_ATTR float lastSentTemp = -999.0; // Initialize with impossible value
+
 uint8_t gatewayAddress[] = {0xF0, 0xF5, 0xBD, 0xFB, 0x26, 0xB4};
 
 typedef struct sensor_data {
@@ -40,13 +47,18 @@ esp_now_peer_info_t peerInfo;
 
 float temp = 0.0;
 float hum = 0.0;
-unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 5000;
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial0.print("Send Status: ");
   Serial0.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
 }
+
+
+// ---------------------------------------------------------
+// ESP-NOW CALLBACK: OnDataRecv
+// Callback function triggered when LED command is received from Gateway
+// Processes incoming LED color commands and updates NeoPixel accordingly
+// ---------------------------------------------------------
 
 void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
   // Debug: Print sender MAC and data length
@@ -89,12 +101,26 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
   Serial0.println("========================================");
 }
 
+// ---------------------------------------------------------
+// FUNCTION: sendSensorData
+// Reads DHT sensor and sends data to Gateway via ESP-NOW
+// ---------------------------------------------------------
 void sendSensorData() {
   temp = dht.readTemperature();
   hum = dht.readHumidity();
   
   if (isnan(temp) || isnan(hum)) {
     Serial0.println("Failed to read DHT sensor");
+    return;
+  }
+  
+  // Check if temperature has changed since last send
+  if (temp == lastSentTemp) {
+    Serial0.println("========================================");
+    Serial0.print("Temperature unchanged (");
+    Serial0.print(temp);
+    Serial0.println(" C) - Skipping send");
+    Serial0.println("========================================");
     return;
   }
   
@@ -118,6 +144,9 @@ void sendSensorData() {
   
   if (result != ESP_OK) {
     Serial0.println("Error sending data");
+  } else {
+    // Update last sent temperature only on successful send
+    lastSentTemp = temp;
   }
 }
 
@@ -129,6 +158,9 @@ void setup() {
   Serial0.print(NODE_ID);
   Serial0.println(" STARTING");
   Serial0.println("========================================");
+  
+  // Configure deep sleep timer (wake after DEEP_SLEEP_DURATION microseconds)
+  esp_sleep_enable_timer_wakeup(DEEP_SLEEP_DURATION);
   
   dht.begin();
   pixel.begin();
@@ -175,18 +207,37 @@ void setup() {
   delay(1000);
   
   Serial0.println("========================================");
-  Serial0.println("NODE READY - MONITORING");
-  Serial0.println("LED initialized to GREEN");
+  Serial0.println("NODE READY - DEEP SLEEP MODE");
+  Serial0.println("Waking every 10 seconds to send data");
   Serial0.println("========================================");
 }
 
 void loop() {
-  unsigned long currentTime = millis();
+  // First, check and send sensor data to Gateway
+  sendSensorData();
   
-  if (currentTime - lastSendTime >= sendInterval) {
-    sendSensorData();
-    lastSendTime = currentTime;
+  // Wait a moment for transmission to complete
+  delay(100);
+  
+  // Listen window: Wait for Gateway response (LED commands based on threshold check)
+  Serial0.print("Listening for Gateway response for ");
+  Serial0.print(LISTEN_WINDOW_MS / 1000);
+  Serial0.println(" seconds...");
+  
+  unsigned long listenStart = millis();
+  while (millis() - listenStart < LISTEN_WINDOW_MS) {
+    // Just wait - OnDataRecv callback handles incoming LED commands
+    delay(10);
   }
   
-  delay(100);
+  Serial0.println("Listen window closed");
+  
+  // Don't turn off LED - preserve Gateway's color command
+  // (LED was already set by OnDataRecv if Gateway sent a command)
+  
+  Serial0.println("Entering deep sleep for 10 seconds...");
+  Serial0.flush(); // Ensure serial data is sent before sleep
+  
+  // Enter deep sleep (ESP32 will restart from setup() on wake)
+  esp_deep_sleep_start();
 }
