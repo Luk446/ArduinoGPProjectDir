@@ -15,5 +15,7 @@ Overview:
 - LED colors show overall system state.
 - Threshold changes and LED overrides are supported.
 - Data published for dashboard viewing.
+- Dashboard hosted on Node-RED 
+- Node-RED handles all the computation for threshold
 - See details: [System Architecture](architecture)
 
