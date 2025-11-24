@@ -12,7 +12,7 @@
 // MQTT CONFIGURATION
 // MQTT broker settings and credentials
 // ---------------------------------------------------------
-#define MQTT_HOST "broker.mqtt.cool"
+#define MQTT_HOST "test.mosquitto.org"
 #define MQTT_PORT 1883
 #define MQTT_DEVICEID "esp_gateway"
 #define MQTT_USER ""
@@ -27,7 +27,7 @@ float testval = 25.0;
 // SYSTEM CONFIGURATION
 // Temperature threshold and WiFi timeout settings
 // ---------------------------------------------------------
-#define TEMP_THRESHOLD 23.0
+#define TEMP_THRESHOLD 15
 #define WIFI_TIMEOUT_MS 10000  // 10 seconds timeout for WiFi connection
 
 // ---------------------------------------------------------
@@ -104,6 +104,10 @@ bool alarmActive = false;
 unsigned long lastPublishTime = 0;
 const unsigned long publishInterval = 5000;
 
+// LED broadcast timing variables
+unsigned long lastLEDBroadcastTime = 0;
+const unsigned long ledBroadcastInterval = 3000;  // Broadcast LED status every 3 seconds
+
 // Connection status flags
 bool wifiConnected = false;
 bool mqttConnected = false;
@@ -150,31 +154,46 @@ void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int l
   Serial0.println("========================================");
   
   if (incomingData.nodeID >= 1 && incomingData.nodeID <= 4) {
-    bool wasInactive = !nodeData[incomingData.nodeID - 1].active;
-    
     nodeData[incomingData.nodeID - 1].temp = incomingData.temp;
     nodeData[incomingData.nodeID - 1].hum = incomingData.hum;
     nodeData[incomingData.nodeID - 1].lastUpdate = millis();
     nodeData[incomingData.nodeID - 1].active = true;
     
-    // Send initial blue LED command when node first connects
-    if (wasInactive && !alarmActive) {
-      Serial0.print("Node ");
-      Serial0.print(incomingData.nodeID);
-      Serial0.println(" activated - sending initial BLUE LED");
-      
+    // Always send LED command based on current alarm state when receiving data
+    // This ensures deep sleep nodes get the current status when they wake
+    Serial0.print("Sending LED status to Node ");
+    Serial0.print(incomingData.nodeID);
+    Serial0.print(": ");
+    
+    if (alarmActive) {
+      Serial0.println("ALARM RED");
+      ledCmd.turnOn = 1;
+      ledCmd.r = 255;
+      ledCmd.g = 0;
+      ledCmd.b = 0;
+    } else {
+      Serial0.println("NORMAL GREEN");
       ledCmd.turnOn = 1;
       ledCmd.r = 0;
-      ledCmd.g = 0;
-      ledCmd.b = 255;
-      
-      if (incomingData.nodeID == 1) {
-        esp_now_send(node1Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
-      } else if (incomingData.nodeID == 2) {
-        esp_now_send(node2Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
-      } else if (incomingData.nodeID == 3) {
-        esp_now_send(node3Address, (uint8_t*)&ledCmd, sizeof(ledCmd));
-      }
+      ledCmd.g = 255;
+      ledCmd.b = 0;
+    }
+    
+    // Send to the specific node that just sent data
+    uint8_t* targetAddress;
+    if (incomingData.nodeID == 1) {
+      targetAddress = node1Address;
+    } else if (incomingData.nodeID == 2) {
+      targetAddress = node2Address;
+    } else if (incomingData.nodeID == 3) {
+      targetAddress = node3Address;
+    } else if (incomingData.nodeID == 4) {
+      targetAddress = node4Address;
+    }
+    
+    esp_err_t result = esp_now_send(targetAddress, (uint8_t*)&ledCmd, sizeof(ledCmd));
+    if (result != ESP_OK) {
+      Serial0.println("Failed to send LED command");
     }
   }
   
@@ -437,10 +456,14 @@ void setup() {
 
   // make sure peers are on same channels
   esp_now_peer_info_t peer;
-  // Use channel 1 for all ESP-NOW communication
-  peerInfo.channel = 1;
+  // ESP-NOW must use the same channel as WiFi
+  // If WiFi connected, use WiFi's channel; otherwise default to channel 1
+  uint8_t espnowChannel = wifiConnected ? WiFi.channel() : 1;
+  peerInfo.channel = espnowChannel;
   peerInfo.encrypt = false;
   
+  Serial0.print("ESP-NOW Channel: ");
+  Serial0.println(espnowChannel);
   Serial0.println("\n Registering Node Peers:");
   
   registerNode(node1Address, "Node 1 (swr)");
@@ -530,6 +553,20 @@ void loop() {
       publishToNodeRED();
       lastPublishTime = currentTime;
     }
+  }
+  
+  // Periodic LED broadcast - independent of data reception
+  // Ensures nodes get LED updates even if they wake between data transmissions
+  unsigned long currentTime = millis();
+  if (currentTime - lastLEDBroadcastTime >= ledBroadcastInterval) {
+    if (alarmActive) {
+      Serial0.println("Periodic Broadcast: ALARM RED");
+      broadcastLEDCommand(true, 255, 0, 0);
+    } else {
+      Serial0.println("Periodic Broadcast: NORMAL GREEN");
+      broadcastLEDCommand(true, 0, 255, 0);
+    }
+    lastLEDBroadcastTime = currentTime;
   }
   
   // ESP-NOW continues to work regardless of WiFi/MQTT status
