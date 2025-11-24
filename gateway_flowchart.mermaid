@@ -1,80 +1,102 @@
 flowchart TD
 
-
-
 %% ============================
-%% 3. VOID LOOP()
-%% ============================
-subgraph LOOP["3. void loop()"]
-    direction TB
-    L1{"WiFi Connected?"}
-    L1 -->|Yes| L2["mqtt.loop()"]
-    L1 -->|No| L9["Skip MQTT Operations"]
-    L2 --> L3{"MQTT Connected?"}
-    L3 -->|No| L4["Check Reconnect Interval"]
-    L3 -->|Yes| L7["Set mqttConnected = true"]
-    L4 --> L5["Attempt MQTT Reconnect"]
-    L5 --> L6{"Reconnect\nSuccessful?"}
-    L6 -->|Yes| L7
-    L6 -->|No| L8["Log Error"]
-    L7 --> L10{"Publish Interval\nElapsed?"}
-    L8 --> L9
-    L10 -->|Yes| L11["publishToNodeRED()"]
-    L10 -->|No| L12["Continue"]
-    L11 --> L12
-    L9 --> L12
-    L12["ESP-NOW Receives Data\nvia Callbacks"] --> L13["delay(100ms)"]
-    L13 --> L1
-end
-
-%% ============================
-%% 2. VOID SETUP()
-%% ============================
-subgraph SETUP["2. void setup()"]
-    direction TB
-    S1["Start Serial Monitor"] --> S2["Initialize Node Data Structures"]
-    S2 --> S3{"WiFi Credentials\nProvided?"}
-    S3 -->|Yes| S4["setupWIFI()"]
-    S3 -->|No| S5["ESP-NOW Only Mode"]
-    S4 --> S6["Initialize ESP-NOW"]
-    S5 --> S6
-    S6 --> S7["Register Callbacks:\nOnDataSent, OnDataRecv"]
-    S7 --> S8["Set Peer Channel to 1"]
-    S8 --> S9["registerNode(): Node 1-4"]
-    S9 --> S10{"WiFi Connected?"}
-    S10 -->|Yes| S11["Connect to MQTT Broker"]
-    S10 -->|No| S12["Skip MQTT Setup"]
-    S11 --> S13["Subscribe to MQTT Topic"]
-    S13 --> S14["checkMQTT()"]
-    S14 --> S15["Gateway Ready"]
-    S12 --> S15
-end
-
-%% ============================
-%% 1. VOID FUNCTION()
-%% ============================
-subgraph FUNCTIONS["1. void function()"]
-    direction TB
-    F1["OnDataSent()"] --> F2["OnDataRecv()"]
-    F2 --> F3["mqttCallback()"]
-    F3 --> F4["checkTemperatureThreshold()"]
-    F4 --> F5["broadcastLEDCommand()"]
-    F5 --> F6["checkMQTT()"]
-    F6 --> F7["publishToNodeRED()"]
-    F7 --> F8["setupWIFI()"]
-    F8 --> F9["registerNode()"]
-end
-
-
-%% ============================
-%% 0. CONFIGURE (Simplified)
+%% 0. CONFIGURE
 %% ============================
 subgraph CONFIGURE["0. Configure"]
     direction TB
     C1["Import Libraries"] --> C2["Set MQTT Configuration"]
-    C2 --> C3["Set System Parameters"]
-    C3 --> C4["Define Node Addresses"]
+    C2 --> C3["Set System Parameters (TEMP_THRESHOLD, testval)"]
+    C3 --> C4["Define Node MAC Addresses"]
     C4 --> C5["Store WiFi Credentials"]
-    C5 --> C6["Define Data Structures"]
-    C6 --> C7["Initialize Global Variables"]
+    C5 --> C6["Define Data Structures (sensor_data, led_command, NodeData[])"]
+    C6 --> C7["Initialize Global Variables (flags, buffers)"]
+    C7 --> C8["Define Timing Intervals (publish, LED, reconnect)"]
+    C8 --> C9["Initialize LED Override State (remoteOverrideActive, RGB)"]
 end
+
+%% ============================
+%% 1. FUNCTIONS (Callbacks & Helpers)
+%% ============================
+subgraph FUNCTIONS["1. Callbacks & Helpers"]
+    direction TB
+    F1["OnDataSent()"] --> F2["OnDataRecv(): Copy & Parse sensor_data"]
+    F2 --> F2A["Update nodeData[] (temp, hum, lastUpdate, active)"]
+    F2A --> F2B["Send LED state to originating node (override/current)"]
+    F2B --> F3["checkTemperatureThreshold(): Update alarmActive"]
+    F4["mqttCallback()"] --> F4A{"Topic?"}
+    F4A -->|ThreshCheck| F4B["Parse JSON -> Update TEMP_THRESHOLD"]
+    F4B --> F3
+    F4A -->|LEDOverride| F4C["Parse JSON -> Update override state (on/R/G/B)"]
+    F4C --> F4D{"overrideActive?"}
+    F4D -->|Yes| F5["broadcastLEDCommand() (all nodes)"]
+    F4D -->|No| F6["Skip broadcast"]
+    F5 --> F7["ESP-NOW sends per node (status logged)"]
+    F8["broadcastLEDCommand() (Periodic / Override)"] --> F7
+    F9["checkMQTT(): Publish test JSON to TestTopic"]
+    F10["publishToNodeRED(): Build JSON d{} + alarm + threshold"]
+end
+
+%% ============================
+%% 2. SETUP
+%% ============================
+subgraph SETUP["2. setup()"]
+    direction TB
+    S1["Start Serial"] --> S2["Init nodeData[] defaults"]
+    S2 --> S3{"WiFi Credentials Provided?"}
+    S3 -->|Yes| S4["setupWIFI(): Attempt STA connect"]
+    S3 -->|No| S5["Mark wifiConnected = false"]
+    S4 --> S6["Init ESP-NOW"]
+    S5 --> S6
+    S6 --> S7["Register Callbacks (OnDataSent, OnDataRecv)"]
+    S7 --> S8["Set ESP-NOW Channel (WiFi.channel or 1)"]
+    S8 --> S9["registerNode() for Nodes 1-4"]
+    S9 --> S10{"wifiConnected?"}
+    S10 -->|Yes| S11["MQTT connect() attempt"]
+    S10 -->|No| S16["Skip MQTT setup"]
+    S11 --> S12{"Connected?"}
+    S12 -->|Yes| S13["Subscribe MQTT_SUB_TOPIC"]
+    S13 --> S14["Subscribe MQTT_LED_TOPIC"]
+    S14 --> S15["checkMQTT(): publish test"]
+    S12 -->|No| S16
+    S15 --> S17["Gateway Ready"]
+    S16 --> S17
+end
+
+%% ============================
+%% 3. LOOP
+%% ============================
+subgraph LOOP["3. loop()"]
+    direction TB
+    L1{"wifiConnected?"}
+    L1 -->|Yes| L2["mqtt.loop()"]
+    L1 -->|No| L8["Skip MQTT Ops"]
+    L2 --> L3{"mqtt.connected()?"}
+    L3 -->|Yes| L7["mqttConnected = true"]
+    L3 -->|No| L4{"Reconnect Interval Elapsed?"}
+    L4 -->|Yes| L5["Attempt mqtt.connect()"]
+    L4 -->|No| L9["Wait"]
+    L5 --> L6{"Reconnect Success?"}
+    L6 -->|Yes| L7
+    L6 -->|No| L8["Log Error / Keep Disconnected"]
+    L7 --> L10{"Publish Interval Elapsed?"}
+    L8 --> L10
+    L9 --> L10
+    L10 -->|Yes| L11["publishToNodeRED()"]
+    L10 -->|No| L12["Skip Publish"]
+    L11 --> L12
+    L12 --> L13{"LED Broadcast Interval Elapsed?"}
+    L13 -->|Yes| L14["broadcastLEDCommand(overrideOn,R,G,B)"]
+    L13 -->|No| L15["No Broadcast"]
+    L14 --> L16["ESP-NOW Callback Processing"]
+    L15 --> L16
+    L8 --> L13
+    L16 --> L17["delay(100ms)"]
+    L17 --> L1
+end
+
+%% Notes:
+%% - Threshold changes only update alarmActive; LED color broadcast is separate and periodic or via override.
+%% - mqttCallback can trigger immediate broadcast on LED override messages.
+%% - Periodic LED broadcasts ensure nodes stay in sync even without recent sensor transmissions.
+%% - Reconnect attempts governed by mqttReconnectInterval.

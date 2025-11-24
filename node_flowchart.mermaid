@@ -1,30 +1,55 @@
 flowchart TD
 
-L1["Begin"]
+%% =====================================
+%% ESP-NOW SENSOR NODE CYCLE (Deep Sleep)
+%% =====================================
 
-LP["loop"]
-CHK["Check for Online Alert"]
-ALR{"Alarm LED"}
+subgraph STARTUP["1. setup() (On Wake)"]
+	direction TB
+	S1["Wake from Deep Sleep"] --> S2["Begin Serial (115200)"]
+	S2 --> S3["Init DHT + NeoPixel"]
+	S3 --> S4["Restore Last LED Color (RTC)"]
+	S4 --> S5["WiFi.mode(STA)"]
+	S5 --> S6["Set Channel = 10"]
+	S6 --> S7["esp_now_init()"]
+	S7 --> S8["Register Callbacks (OnDataSent, OnDataRecv)"]
+	S8 --> S9["Add Gateway Peer (channel 10)"]
+	S9 --> S10["Node Ready"]
+end
 
-CD["Collect Local Data"]
+subgraph LOOP["2. loop() Single Cycle"]
+	direction TB
+	L1["sendSensorData()"] --> L2{"Read DHT OK?"}
+	L2 -->|No| L3["Log Failure & Skip Send"]
+	L2 -->|Yes| L4{"Temp Changed vs lastSentTemp?"}
+	L4 -->|No| L5["Log Unchanged Temp -> Skip Send"]
+	L4 -->|Yes| L6["Populate sensor_data struct"]
+	L6 --> L7["esp_now_send(gateway)"]
+	L7 --> L8{"Send Success?"}
+	L8 -->|Yes| L9["Update lastSentTemp"]
+	L8 -->|No| L10["Log Error"]
+	L3 --> L11["delay(100ms)"]
+	L5 --> L11
+	L9 --> L11
+	L10 --> L11
+	L11 --> L12["Listening Window (LISTEN_WINDOW_MS ~10s)"]
+	L12 --> L13["OnDataRecv may update LED"]
+	L13 --> L14["Enter Deep Sleep (DEEP_SLEEP_DURATION)"]
+end
 
-IF{"Check Temp"}
-TH["Too hot"]
-NORM["Normal+Different"]
-LOG[(Log Data)]
-SAME["Same"]
+subgraph CALLBACKS["3. Callbacks"]
+	direction TB
+	C1["OnDataRecv(recv_info,data,len)"] --> C2{"len == sizeof(led_command)?"}
+	C2 -->|No| C3["Warn Size Mismatch"]
+	C2 -->|Yes| C4["memcpy -> ledCmd"]
+	C4 --> C5["Update NeoPixel (r,g,b)"]
+	C5 --> C6["Persist Color (RTC lastLedR/G/B)"]
+	C6 --> C7["Log LED Updated"]
+	C8["OnDataSent(status)"] --> C9["Log Success/Fail"]
+end
 
-BC["Broadcast Online Alert"]
-TRD["Transmit Data"]
-
-DS{"Deep Sleep"}
-
-L1 --> LP --> CHK --> CD --> IF
-CHK --> ALR
-
-IF -->TH --> BC --> ALR --> CD
-IF -->NORM --> TRD --> LOG --> DS
-IF -->SAME --> DS --> LP
-
-LOG <--> IF
+%% Notes:
+%% - Device sleeps after a single loop cycle; all state except lastSentTemp & last LED color is reinitialized next wake.
+%% - Temperature send suppressed if unchanged to save power & bandwidth.
+%% - LED color persists across sleep via RTC memory and may be updated during listening window.
 

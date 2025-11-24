@@ -9,7 +9,7 @@
 // kuro = 2
 // ignacio = 3
 // mur = 4
-#define NODE_ID 2
+#define NODE_ID 4
 
 #define RGB_PIN 5
 #define DHT_PIN 4
