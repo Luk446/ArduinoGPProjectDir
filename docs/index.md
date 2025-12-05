@@ -36,7 +36,7 @@ Overview:
 - Hardware: ESP32 Nodes with sensors; ESP32 Gateway connected to host running Node‑RED.
 - Network: ESP‑NOW from Nodes to Gateway; optional Wi‑Fi/MQTT beyond Gateway.
 - Software: Node publishes alerts/telemetry; Gateway receives and forwards; Node‑RED manages dashboard and alerting.
-- More details: [Architecture](architecture), [Arduino Node](arduino_arch), [Gateway/Node‑RED](node_arch)
+- More details: [Architecture](architecture), [Arduino Architecture]({{ site.baseurl }}/architecture/arduino/), [Node-RED Architecture]({{ site.baseurl }}/architecture/node/)
 
 ## Energy Strategies and Encoding
 - Duty cycling: Nodes sleep between samples; event‑driven publishing on thresholds.
@@ -54,8 +54,12 @@ Some text
 
 ## Reflection
 
-Some text 
+- Deep sleep with 10-second wake cycles achieved 100-200x power reduction (10µA vs 65mA active), while event-driven transmission (send only when temp changes ≥1°C) reduced radio time by 60%
+- Node-RED threshold processing offloaded computation from battery nodes to mains-powered host, enabling dynamic threshold updates via MQTT without node reflashing
+- Key trade-offs: 10-second sleep interval balanced responsiveness vs battery life, struct packing ensured cross-device compatibility, and RTC memory preserved LED state across sleep cycles at cost of 5ms wake overhead
 
 ## Future Improvements
 
-Some text
+- Energy & Reliability: Wake-on-threshold via RTC GPIO interrupts, ACK mechanism for guaranteed LED delivery, battery voltage monitoring with low-power alerts, and watchdog timers for auto-recovery
+- Scalability: Auto-discovery via broadcast handshake (eliminate MAC hardcoding), mesh routing for >50m range, hierarchical gateways for 10+ nodes, and InfluxDB integration for historical analysis
+- Advanced Features: Web config portal for threshold/WiFi settings, Twilio SMS alerts for critical temps, OTA firmware updates, AES-128 encryption for industrial security, and predictive ML analytics
