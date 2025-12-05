@@ -25,7 +25,12 @@ Overview:
 - Repository: https://github.com/Luk446/ArduinoGPProjectDir
 - Arduino sketches: `Arduino/ESP-Node/ESP-Node.ino`, `Arduino/ESP-Gateway/ESP-Gateway.ino`
 - Node-RED flows: `Node-RED/flows.json` (plus drafts for experiments)
-- Libraries referenced: see `libraries/` for Adafruit, ArduinoJson, PubSubClient, DHT sensor, etc.
+### Libraries Used
+- `Adafruit_NeoPixel`: drive the RGB NeoPixel on nodes.
+- `DHT sensor library`: read temperature/humidity from DHT11.
+- `ArduinoJson`: build/parse MQTT JSON payloads.
+- `PubSubClient`: MQTT client for publishing/subscribing.
+- `esp_now`, `WiFi`, `esp_wifi` (ESP32 core): transport and channel configuration.
 
 ## Design and Architecture
 - Hardware: ESP32 Nodes with sensors; ESP32 Gateway connected to host running Node‑RED.
