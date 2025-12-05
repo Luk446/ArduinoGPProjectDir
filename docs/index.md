@@ -43,10 +43,6 @@ Overview:
 - Lightweight frames: compact byte/struct payloads for ESP‑NOW; minimal JSON at Gateway only.
 - Backoff/retry limits: reduce collisions and radio time; short LED feedback only when debugging.
 
-## Testing Results
-
-Some text
-
 ## Deployment and Use
 1. Flash firmware: open `ESP-Node.ino` and `ESP-Gateway.ino` in Arduino IDE; select ESP32 board; install required libraries; set `NODE_ID` and Wi‑Fi creds (Gateway if needed); upload.
 2. Node‑RED: install and start Node‑RED; import `Node-RED/flows.json`; configure serial/MQTT nodes to match Gateway; deploy; open dashboard.
