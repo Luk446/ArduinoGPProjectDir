@@ -61,7 +61,7 @@ If the temperature is too hot or too cold the function sends out a JSON message 
 
 ## **Thresholds**
 
-The Final part is the setting that changes the threshold values for each node individually. This is done in the flow below. [[Threshold Flow]](images/threshold_setting.png)
+The Final part is the setting that changes the threshold values for each node individually. This is done in the flow below. [[Threshold Flow]](images/Threshold_setting.png)
 
 The dashboard will display a list of inputs that can be changed.(_ESP# Thresh_) It will save the inputted value (_StoredValues_) to dynamically change the threshold values of the nodes. This will also dynamically change within Node-RED to display the current temperature condition accordingly. 
 
