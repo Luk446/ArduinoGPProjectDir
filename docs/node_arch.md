@@ -54,7 +54,9 @@ The text node (_Current Condition ESP-#_) displays he current status of each nod
 
 The change node (_set.flow.Condition#_) is used to save the current condition to get it checked. 
 
-Finally the function Node (_function1_) collects the current condition from each node and outputs LED Values.([[code]])(images/ledCode.png) If the temperature is too hot or too cold the function sends out a JSON message to the gateway (_LEDOverride4482_) to change the LED values of the nodes to RED. Otherwise it sends the gateway a value of GREEN. 
+Finally the function Node (_function1_) collects the current condition from each node and outputs LED Values. 
+([[code]])(images/ledCode.png) 
+If the temperature is too hot or too cold the function sends out a JSON message to the gateway (_LEDOverride4482_) to change the LED values of the nodes to RED. Otherwise it sends the gateway a value of GREEN. 
 
 
 ## **Thresholds**
