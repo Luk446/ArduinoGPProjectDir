@@ -11,7 +11,7 @@ Hello
 
 Node-red does most of the processing in terms of determining the temperature status and reporting back to the gateway. 
 Below is the complete flow of the Node-RED architecture. 
-[[Full Node-RED flow]](images/FlowNodeREd.png)
+[[Full Node-RED flow]](images/FlowNodeREd.png) (_debug nodes are used for backend debugging_)
 
 The architecture can be split into 4 different sections.
 1. Initializing
